@@ -213,7 +213,7 @@ const ItemRow = memo(({ sec, it, idx, onUpdate, onRemove, onImage }) => {
 
 export default function ProposalApp() {
   const [header, setHeader] = useState({
-    project: "Privet Villa", location: "Abu Dhabi",
+    project: "", location: "Abu Dhabi",
     date: new Date().toISOString().slice(0, 10),
     ref: "LTR-ZT-HIM-BOR-14102024004-00",
     client: "Mr. Saeed",
@@ -230,8 +230,8 @@ export default function ProposalApp() {
     { id: 4, name: "Sound System", items: [newItem()] },
     { id: 5, name: "Network Structure", items: [newItem()] },
   ]);
-  const [installation, setInstallation] = useState("3000");
-  const [discount, setDiscount] = useState("3000");
+  const [installation, setInstallation] = useState("0");
+  const [discount, setDiscount] = useState("0");
   const [terms, setTerms] = useState(DEFAULT_TERMS);
   const [tab, setTab] = useState("edit");
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -392,8 +392,8 @@ export default function ProposalApp() {
         <table style={{ width: 380, borderCollapse: "collapse", border: "1.5px solid #2d6a4f" }}>
           {[
             ["Sections Subtotal", fmt(allSectionTotal)],
-            ["Installation & Configuration", fmt(parseNum(installation))],
-            ["Subtotal", fmt(grandSubtotal)],
+            ...(parseNum(installation) > 0 ? [["Installation & Configuration", fmt(parseNum(installation))]] : []),
+            ...((parseNum(installation) > 0 || parseNum(discount) > 0) ? [["Subtotal", fmt(grandSubtotal)]] : []),
             ...(parseNum(discount) > 0 ? [["Discount", `-${fmt(parseNum(discount))}`], ["After Discount", fmt(afterDiscount)]] : []),
             ["VAT 5%", fmt(vat)]
           ].map(([k, v]) => (
