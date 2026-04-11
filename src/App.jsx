@@ -256,27 +256,17 @@ export default function ProposalApp() {
     setTimeout(() => els.forEach(el => el.style.display = ""), 1000);
   };
 
-  const handleExportPDF = async () => {
-    setPdfLoading(true);
-    try {
-      if (!window.html2pdf) {
-        await new Promise((res, rej) => {
-          const s = document.createElement("script");
-          s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
-          s.onload = res; s.onerror = rej;
-          document.head.appendChild(s);
-        });
-      }
-      const el = document.getElementById("pdf-content");
-      await window.html2pdf().set({
-        margin: [8, 8, 8, 8],
-        filename: `Zettanet-Proposal-${header.client || "Client"}-${header.date}.pdf`,
-        image: { type: "jpeg", quality: 1 },
-        html2canvas: { scale: 3, useCORS: true, letterRendering: true },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
-      }).from(el).save();
-    } catch (e) { alert("PDF export failed. Use Print → Save as PDF instead."); }
-    setPdfLoading(false);
+  const handleExportPDF = () => {
+    // Switch to preview tab so PDF content is visible
+    setTab("preview");
+    setTimeout(() => {
+      const els = document.querySelectorAll(".no-print");
+      els.forEach(el => el.style.display = "none");
+      window.print();
+      setTimeout(() => {
+        els.forEach(el => el.style.display = "");
+      }, 1500);
+    }, 300);
   };
 
   const S = {
@@ -389,7 +379,7 @@ export default function ProposalApp() {
       <div className="no-print" style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
         {["edit", "preview"].map(t => <button key={t} onClick={() => setTab(t)} style={S.tabBtn(tab === t)}>{t === "edit" ? "Edit Proposal" : "Preview"}</button>)}
         <button onClick={handlePrint} style={S.btn("#444")}>Print</button>
-        <button onClick={handleExportPDF} disabled={pdfLoading} style={{ ...S.btn(C.darker), opacity: pdfLoading ? 0.7 : 1 }}>{pdfLoading ? "Generating..." : "Export PDF"}</button>
+        <button onClick={handleExportPDF} style={S.btn(C.darker)}>Export PDF</button>
       </div>
 
       {tab === "edit" && <>
