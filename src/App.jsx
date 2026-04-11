@@ -390,7 +390,13 @@ export default function ProposalApp() {
 
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 24 }}>
         <table style={{ width: 380, borderCollapse: "collapse", border: "1.5px solid #2d6a4f" }}>
-          {[["Sections Subtotal", fmt(allSectionTotal)], ["Installation & Configuration", fmt(parseNum(installation))], ["Subtotal", fmt(grandSubtotal)], ["Discount", `-${fmt(parseNum(discount))}`], ["After Discount", fmt(afterDiscount)], ["VAT 5%", fmt(vat)]].map(([k, v]) => (
+          {[
+            ["Sections Subtotal", fmt(allSectionTotal)],
+            ["Installation & Configuration", fmt(parseNum(installation))],
+            ["Subtotal", fmt(grandSubtotal)],
+            ...(parseNum(discount) > 0 ? [["Discount", `-${fmt(parseNum(discount))}`], ["After Discount", fmt(afterDiscount)]] : []),
+            ["VAT 5%", fmt(vat)]
+          ].map(([k, v]) => (
             <tr key={k}>
               <td style={{ padding: "5px 10px", fontSize: 11, borderBottom: "1px solid #ddd" }}>{k}</td>
               <td style={{ padding: "5px 10px", textAlign: "right", fontSize: 11, borderBottom: "1px solid #ddd" }}>{v}</td>
@@ -518,7 +524,13 @@ export default function ProposalApp() {
             </div>
           </div>
           <div style={{ background: "#f5f9f5", border: "1.5px solid #2d6a4f", borderRadius: 6, padding: "14px 18px" }}>
-            {[["Sections Subtotal", fmt(allSectionTotal)], ["Installation & Configuration", fmt(parseNum(installation))], ["Subtotal", fmt(grandSubtotal)], ["Discount", `-${fmt(parseNum(discount))}`], ["After Discount", fmt(afterDiscount)], ["VAT 5%", fmt(vat)]].map(([k, v]) => (
+            {[
+              ["Sections Subtotal", fmt(allSectionTotal)],
+              ["Installation & Configuration", fmt(parseNum(installation))],
+              ["Subtotal", fmt(grandSubtotal)],
+              ...(parseNum(discount) > 0 ? [["Discount", `-${fmt(parseNum(discount))}`], ["After Discount", fmt(afterDiscount)]] : []),
+              ["VAT 5%", fmt(vat)]
+            ].map(([k, v]) => (
               <div key={k} style={S.summaryRow(false)}><span>{k}</span><span>{v}</span></div>
             ))}
             <div style={S.summaryRow(true)}><span>Total Amount</span><span>{fmt(finalTotal)}</span></div>
