@@ -48,7 +48,7 @@ Exclusions:
 Warranty:
 • 1 year after delivery of equipment (smart home systems).`;
 
-const newItem = () => ({ id: Date.now() + Math.random(), desc: "", qty: 1, price: 0, image: null, preset: "" });
+const newItem = () => ({ id: Date.now() + Math.random(), desc: "", qty: "1", price: "0", image: null, preset: "", imgSize: 80 });
 const newSection = (name = "New Section") => ({ id: Date.now(), name, items: [newItem()] });
 
 const DEFAULT_SECTIONS = [
@@ -64,10 +64,11 @@ const SECTION_NAMES = ["Smart Automation", "Video Intercom", "CCTV System", "Sou
 export default function ProposalApp() {
   const [header, setHeader] = useState({ project: "Privet Villa", location: "Abu Dhabi", date: new Date().toISOString().slice(0,10), ref: "LTR-ZT-HIM-BOR-14102024004-00", client: "Mr. Saeed", company: "Zettanet Technologies", companyEmail: "info@zettanet.tech", companyAddress: "P.O. Box: 114345, Abu Dhabi, UAE" });
   const [sections, setSections] = useState(DEFAULT_SECTIONS);
-  const [installation, setInstallation] = useState(3000);
-  const [discount, setDiscount] = useState(3000);
+  const [installation, setInstallation] = useState("3000");
+  const [discount, setDiscount] = useState("3000");
   const [terms, setTerms] = useState(DEFAULT_TERMS);
   const [tab, setTab] = useState("edit");
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const updateHeader = (k, v) => setHeader(h => ({ ...h, [k]: v }));
 
@@ -81,7 +82,7 @@ export default function ProposalApp() {
     const presets = PRESET_ITEMS[secName] || [];
     const found = presets.find(p => p.desc === presetDesc);
     setSections(s => s.map(sec => sec.id !== secId ? sec : {
-      ...sec, items: sec.items.map(it => it.id !== itemId ? it : { ...it, preset: presetDesc, desc: found ? found.desc : presetDesc, price: found ? found.price : it.price })
+      ...sec, items: sec.items.map(it => it.id !== itemId ? it : { ...it, preset: presetDesc, desc: found ? found.desc : presetDesc, price: found ? String(found.price) : it.price })
     }));
   };
 
@@ -98,28 +99,44 @@ export default function ProposalApp() {
     reader.readAsDataURL(file);
   };
 
-  const secTotal = sec => sec.items.reduce((sum, it) => sum + (parseFloat(it.qty)||0) * (parseFloat(it.price)||0), 0);
+  const parseNum = v => parseFloat(v) || 0;
+  const secTotal = sec => sec.items.reduce((sum, it) => sum + parseNum(it.qty) * parseNum(it.price), 0);
   const allSectionTotal = sections.reduce((sum, sec) => sum + secTotal(sec), 0);
-  const grandSubtotal = allSectionTotal + (parseFloat(installation)||0);
-  const afterDiscount = grandSubtotal - (parseFloat(discount)||0);
+  const grandSubtotal = allSectionTotal + parseNum(installation);
+  const afterDiscount = grandSubtotal - parseNum(discount);
   const vat = afterDiscount * 0.05;
   const finalTotal = afterDiscount + vat;
 
-  const fmt = n => `AED ${Number(n).toLocaleString("en-AE", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  const fmt = n => `AED ${Number(n).toLocaleString("en-AE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-  const handlePrint = () => {
-    window.print();
+  const handleExportPDF = async () => {
+    setPdfLoading(true);
+    try {
+      const html2pdf = (await import("https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js")).default;
+      const el = document.getElementById("pdf-content");
+      await html2pdf().set({
+        margin: 10,
+        filename: `Zettanet-Proposal-${header.client}-${header.date}.pdf`,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
+      }).from(el).save();
+    } catch(e) {
+      alert("PDF export failed. Please use Print → Save as PDF instead.");
+    }
+    setPdfLoading(false);
   };
 
   const S = {
-    page: { fontFamily: "sans-serif", maxWidth: 900, margin: "0 auto", padding: "0 0 60px" },
-    tabs: { display: "flex", gap: 8, marginBottom: 20 },
+    page: { fontFamily: "sans-serif", maxWidth: 960, margin: "0 auto", padding: "0 0 60px" },
+    tabs: { display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" },
     tabBtn: active => ({ padding: "8px 20px", border: "1px solid #ccc", borderRadius: 6, cursor: "pointer", background: active ? "#2d6a4f" : "#fff", color: active ? "#fff" : "#333", fontWeight: active ? 600 : 400 }),
     card: { background: "#fff", border: "1px solid #e0e0e0", borderRadius: 8, padding: 20, marginBottom: 20 },
     label: { fontSize: 12, color: "#666", display: "block", marginBottom: 4 },
     input: { width: "100%", padding: "7px 10px", border: "1px solid #ddd", borderRadius: 5, fontSize: 13, boxSizing: "border-box" },
+    numInput: { width: "100%", padding: "7px 10px", border: "1px solid #ddd", borderRadius: 5, fontSize: 13, boxSizing: "border-box", textAlign: "right" },
     sectionHeader: { background: "#5a7a4a", color: "#fff", padding: "8px 14px", borderRadius: "6px 6px 0 0", fontWeight: 600, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "space-between" },
-    th: { background: "#f5f5f5", padding: "8px 10px", textAlign: "left", fontSize: 12, fontWeight: 600, borderBottom: "1px solid #ddd" },
+    th: { background: "#f5f5f5", padding: "8px 10px", textAlign: "left", fontSize: 12, fontWeight: 600, borderBottom: "1px solid #ddd", whiteSpace: "nowrap" },
     td: { padding: "8px 10px", fontSize: 13, verticalAlign: "middle", borderBottom: "1px solid #f0f0f0" },
     btn: (color="#2d6a4f") => ({ background: color, color: "#fff", border: "none", borderRadius: 5, padding: "5px 12px", cursor: "pointer", fontSize: 12 }),
     removeBtn: { background: "transparent", border: "none", cursor: "pointer", color: "#c00", fontSize: 16, lineHeight: 1 },
@@ -129,18 +146,34 @@ export default function ProposalApp() {
 
   const ItemRow = ({ sec, it, idx }) => {
     const presets = PRESET_ITEMS[sec.name] || [];
-    const total = (parseFloat(it.qty)||0) * (parseFloat(it.price)||0);
+    const total = parseNum(it.qty) * parseNum(it.price);
     const fileRef = useRef();
+    const imgSize = it.imgSize || 80;
+
     return (
       <tr>
         <td style={S.td}>{idx+1}</td>
-        <td style={{...S.td, width: 70}}>
-          <div style={{ width: 54, height: 54, border: "1px dashed #ccc", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", overflow: "hidden" }}
-            onClick={() => fileRef.current.click()}>
-            {it.image ? <img src={it.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="" /> : <span style={{ fontSize: 20, color: "#bbb" }}>+</span>}
-            <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => handleImageUpload(sec.id, it.id, e.target.files[0])} />
+        <td style={{...S.td, width: imgSize + 24}}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+            <div
+              style={{ width: imgSize, height: imgSize, border: "1px dashed #ccc", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", overflow: "hidden", flexShrink: 0 }}
+              onClick={() => fileRef.current.click()}>
+              {it.image
+                ? <img src={it.image} style={{ width: "100%", height: "100%", objectFit: "contain" }} alt="" />
+                : <span style={{ fontSize: 22, color: "#bbb" }}>+</span>}
+              <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => handleImageUpload(sec.id, it.id, e.target.files[0])} />
+            </div>
+            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+              <input
+                type="range" min={50} max={200} value={imgSize} step={10}
+                style={{ width: 60 }}
+                onChange={e => updateItem(sec.id, it.id, "imgSize", Number(e.target.value))}
+                title="Resize photo"
+              />
+              <span style={{ fontSize: 10, color: "#999" }}>{imgSize}px</span>
+            </div>
+            {it.image && <button onClick={() => updateItem(sec.id, it.id, "image", null)} style={{ ...S.removeBtn, fontSize: 11 }}>remove</button>}
           </div>
-          {it.image && <button onClick={() => updateItem(sec.id, it.id, "image", null)} style={{ ...S.removeBtn, fontSize: 11, marginTop: 2 }}>remove</button>}
         </td>
         <td style={{...S.td, minWidth: 220}}>
           {presets.length > 0 && (
@@ -155,13 +188,25 @@ export default function ProposalApp() {
             placeholder="Item description..." rows={2}
             style={{ ...S.input, resize: "vertical", fontSize: 12 }} />
         </td>
-        <td style={{...S.td, width: 70}}>
-          <input type="number" min={1} value={it.qty} onChange={e => updateItem(sec.id, it.id, "qty", e.target.value)} style={{ ...S.input, textAlign: "center" }} />
+        <td style={{...S.td, width: 90}}>
+          <input
+            type="number" min={0} step="0.01"
+            value={it.qty}
+            onChange={e => updateItem(sec.id, it.id, "qty", e.target.value)}
+            onBlur={e => { if(e.target.value === "" || isNaN(e.target.value)) updateItem(sec.id, it.id, "qty", "0"); }}
+            style={S.numInput}
+          />
         </td>
-        <td style={{...S.td, width: 100}}>
-          <input type="number" min={0} value={it.price} onChange={e => updateItem(sec.id, it.id, "price", e.target.value)} style={{ ...S.input, textAlign: "right" }} />
+        <td style={{...S.td, width: 120}}>
+          <input
+            type="number" min={0} step="0.01"
+            value={it.price}
+            onChange={e => updateItem(sec.id, it.id, "price", e.target.value)}
+            onBlur={e => { if(e.target.value === "" || isNaN(e.target.value)) updateItem(sec.id, it.id, "price", "0"); }}
+            style={S.numInput}
+          />
         </td>
-        <td style={{...S.td, width: 110, textAlign: "right", fontWeight: 500}}>{fmt(total)}</td>
+        <td style={{...S.td, width: 130, textAlign: "right", fontWeight: 500}}>{fmt(total)}</td>
         <td style={{...S.td, width: 36}}>
           <button onClick={() => removeItem(sec.id, it.id)} style={S.removeBtn} title="Remove item">×</button>
         </td>
@@ -169,64 +214,81 @@ export default function ProposalApp() {
     );
   };
 
-  const PrintView = () => (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: 32, fontSize: 13 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
+  const PDFContent = () => (
+    <div id="pdf-content" style={{ fontFamily: "Arial, sans-serif", padding: 24, fontSize: 12, color: "#000", background: "#fff" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
         <div>
-          <div style={{ fontWeight: 700, fontSize: 16, color: "#2d6a4f" }}>{header.company}</div>
-          <div style={{ color: "#555", fontSize: 12 }}>{header.companyAddress}</div>
-          <div style={{ color: "#555", fontSize: 12 }}>E: {header.companyEmail}</div>
+          <div style={{ fontWeight: 700, fontSize: 15, color: "#2d6a4f" }}>{header.company}</div>
+          <div style={{ color: "#555", fontSize: 11, marginTop: 2 }}>{header.companyAddress}</div>
+          <div style={{ color: "#555", fontSize: 11 }}>E: {header.companyEmail}</div>
         </div>
-        <div style={{ textAlign: "right", fontSize: 12, color: "#555" }}>
+        <div style={{ textAlign: "right", fontSize: 11, color: "#555" }}>
           <div><b>Date:</b> {header.date}</div>
           <div><b>Ref:</b> {header.ref}</div>
           <div><b>Project:</b> {header.project}</div>
           <div><b>Location:</b> {header.location}</div>
         </div>
       </div>
-      <div style={{ marginBottom: 20, fontSize: 14 }}><b>Client Name:</b> {header.client}</div>
+      <div style={{ marginBottom: 16, fontSize: 13 }}><b>Client Name:</b> {header.client}</div>
+
       {sections.map(sec => (
-        <div key={sec.id} style={{ marginBottom: 24 }}>
-          <div style={{ background: "#5a7a4a", color: "#fff", padding: "7px 12px", fontWeight: 700, fontSize: 13 }}>{sec.name}</div>
+        <div key={sec.id} style={{ marginBottom: 20 }}>
+          <div style={{ background: "#5a7a4a", color: "#fff", padding: "6px 10px", fontWeight: 700, fontSize: 12 }}>{sec.name}</div>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>{["SN","Photo","Item Description","QTY","Unit Price","Total"].map(h => (
-                <th key={h} style={{ background: "#f0f0f0", padding: "6px 8px", textAlign: "left", fontSize: 12, fontWeight: 600, border: "1px solid #ddd" }}>{h}</th>
+                <th key={h} style={{ background: "#f0f0f0", padding: "5px 8px", textAlign: "left", fontSize: 11, fontWeight: 600, border: "1px solid #ddd" }}>{h}</th>
               ))}</tr>
             </thead>
             <tbody>
               {sec.items.map((it, i) => {
-                const tot = (parseFloat(it.qty)||0)*(parseFloat(it.price)||0);
+                const tot = parseNum(it.qty) * parseNum(it.price);
+                const sz = Math.min(it.imgSize || 80, 80);
                 return (
                   <tr key={it.id}>
-                    <td style={{ padding: "6px 8px", border: "1px solid #eee", textAlign: "center" }}>{i+1}</td>
-                    <td style={{ padding: "4px 8px", border: "1px solid #eee", textAlign: "center" }}>
-                      {it.image && <img src={it.image} style={{ width: 50, height: 50, objectFit: "cover" }} alt="" />}
+                    <td style={{ padding: "5px 8px", border: "1px solid #eee", textAlign: "center", width: 30 }}>{i+1}</td>
+                    <td style={{ padding: "4px 8px", border: "1px solid #eee", textAlign: "center", width: sz + 16 }}>
+                      {it.image && <img src={it.image} style={{ width: sz, height: sz, objectFit: "contain" }} alt="" />}
                     </td>
-                    <td style={{ padding: "6px 8px", border: "1px solid #eee" }}>{it.desc}</td>
-                    <td style={{ padding: "6px 8px", border: "1px solid #eee", textAlign: "center" }}>{it.qty}</td>
-                    <td style={{ padding: "6px 8px", border: "1px solid #eee", textAlign: "right" }}>{it.price}</td>
-                    <td style={{ padding: "6px 8px", border: "1px solid #eee", textAlign: "right", fontWeight: 600 }}>{fmt(tot)}</td>
+                    <td style={{ padding: "5px 8px", border: "1px solid #eee" }}>{it.desc}</td>
+                    <td style={{ padding: "5px 8px", border: "1px solid #eee", textAlign: "center", width: 50 }}>{it.qty}</td>
+                    <td style={{ padding: "5px 8px", border: "1px solid #eee", textAlign: "right", width: 80 }}>{parseNum(it.price).toFixed(2)}</td>
+                    <td style={{ padding: "5px 8px", border: "1px solid #eee", textAlign: "right", fontWeight: 600, width: 100 }}>{fmt(tot)}</td>
                   </tr>
                 );
               })}
               <tr>
-                <td colSpan={5} style={{ textAlign: "right", padding: "6px 8px", background: "#5a7a4a", color: "#fff", fontWeight: 700 }}>Section Total</td>
-                <td style={{ textAlign: "right", padding: "6px 8px", background: "#5a7a4a", color: "#fff", fontWeight: 700 }}>{fmt(secTotal(sec))}</td>
+                <td colSpan={5} style={{ textAlign: "right", padding: "5px 8px", background: "#5a7a4a", color: "#fff", fontWeight: 700, border: "1px solid #5a7a4a" }}>Section Total</td>
+                <td style={{ textAlign: "right", padding: "5px 8px", background: "#5a7a4a", color: "#fff", fontWeight: 700, border: "1px solid #5a7a4a" }}>{fmt(secTotal(sec))}</td>
               </tr>
             </tbody>
           </table>
         </div>
       ))}
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 24 }}>
-        <table style={{ width: 380, borderCollapse: "collapse" }}>
-          {[["Sections Subtotal", fmt(allSectionTotal)], ["Installation & Configuration", fmt(installation)], ["Subtotal", fmt(grandSubtotal)], ["Discount", `-${fmt(discount)}`], ["After Discount", fmt(afterDiscount)], ["VAT 5%", fmt(vat)]].map(([k,v]) => (
-            <tr key={k}><td style={{ padding: "4px 10px", fontSize: 12 }}>{k}</td><td style={{ padding: "4px 10px", textAlign: "right", fontSize: 12 }}>{v}</td></tr>
+
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 20 }}>
+        <table style={{ width: 360, borderCollapse: "collapse" }}>
+          {[
+            ["Sections Subtotal", fmt(allSectionTotal)],
+            ["Installation & Configuration", fmt(parseNum(installation))],
+            ["Subtotal", fmt(grandSubtotal)],
+            ["Discount", `-${fmt(parseNum(discount))}`],
+            ["After Discount", fmt(afterDiscount)],
+            ["VAT 5%", fmt(vat)]
+          ].map(([k,v]) => (
+            <tr key={k}>
+              <td style={{ padding: "4px 10px", fontSize: 11, borderBottom: "1px solid #eee" }}>{k}</td>
+              <td style={{ padding: "4px 10px", textAlign: "right", fontSize: 11, borderBottom: "1px solid #eee" }}>{v}</td>
+            </tr>
           ))}
-          <tr><td style={{ padding: "8px 10px", fontWeight: 700, background: "#5a7a4a", color: "#fff", fontSize: 14 }}>Total Amount</td><td style={{ padding: "8px 10px", fontWeight: 700, textAlign: "right", background: "#5a7a4a", color: "#fff", fontSize: 14 }}>{fmt(finalTotal)}</td></tr>
+          <tr>
+            <td style={{ padding: "8px 10px", fontWeight: 700, background: "#5a7a4a", color: "#fff", fontSize: 13 }}>Total Amount</td>
+            <td style={{ padding: "8px 10px", fontWeight: 700, textAlign: "right", background: "#5a7a4a", color: "#fff", fontSize: 13 }}>{fmt(finalTotal)}</td>
+          </tr>
         </table>
       </div>
-      <div style={{ whiteSpace: "pre-wrap", fontSize: 12, color: "#444", borderTop: "1px solid #ddd", paddingTop: 16 }}>{terms}</div>
+
+      <div style={{ whiteSpace: "pre-wrap", fontSize: 11, color: "#444", borderTop: "1px solid #ddd", paddingTop: 12 }}>{terms}</div>
     </div>
   );
 
@@ -238,8 +300,11 @@ export default function ProposalApp() {
       </div>
 
       <div style={S.tabs}>
-        {["edit","preview"].map(t => <button key={t} onClick={() => setTab(t)} style={S.tabBtn(tab===t)}>{t === "edit" ? "Edit Proposal" : "Preview / Print"}</button>)}
-        <button onClick={handlePrint} style={{ ...S.btn("#1a4a32"), marginLeft: "auto" }}>Print / Export PDF</button>
+        {["edit","preview"].map(t => <button key={t} onClick={() => setTab(t)} style={S.tabBtn(tab===t)}>{t === "edit" ? "Edit Proposal" : "Preview"}</button>)}
+        <button onClick={() => window.print()} style={{ ...S.btn("#444") }}>Print</button>
+        <button onClick={handleExportPDF} disabled={pdfLoading} style={{ ...S.btn("#1a4a32"), opacity: pdfLoading ? 0.7 : 1 }}>
+          {pdfLoading ? "Generating PDF..." : "Export PDF"}
+        </button>
       </div>
 
       {tab === "edit" && <>
@@ -271,7 +336,7 @@ export default function ProposalApp() {
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr>
-                    {["SN","Photo","Item Description","QTY","Unit Price (AED)","Total",""].map(h => (
+                    {["SN","Photo (drag slider to resize)","Item Description","QTY","Unit Price (AED)","Total",""].map(h => (
                       <th key={h} style={S.th}>{h}</th>
                     ))}
                   </tr>
@@ -303,15 +368,22 @@ export default function ProposalApp() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
             <div>
               <label style={S.label}>Installation / Programming / Configuration (AED)</label>
-              <input type="number" value={installation} onChange={e => setInstallation(e.target.value)} style={S.input} />
+              <input type="number" min={0} step="0.01" value={installation} onChange={e => setInstallation(e.target.value)} style={S.numInput} />
             </div>
             <div>
               <label style={S.label}>Discount (AED)</label>
-              <input type="number" value={discount} onChange={e => setDiscount(e.target.value)} style={S.input} />
+              <input type="number" min={0} step="0.01" value={discount} onChange={e => setDiscount(e.target.value)} style={S.numInput} />
             </div>
           </div>
           <div style={{ background: "#f9f9f9", border: "1px solid #eee", borderRadius: 6, padding: "14px 18px" }}>
-            {[["Sections Subtotal", fmt(allSectionTotal)], ["Installation & Configuration", fmt(installation)], ["Subtotal", fmt(grandSubtotal)], ["Discount", `-${fmt(discount)}`], ["After Discount", fmt(afterDiscount)], ["VAT 5%", fmt(vat)]].map(([k,v]) => (
+            {[
+              ["Sections Subtotal", fmt(allSectionTotal)],
+              ["Installation & Configuration", fmt(parseNum(installation))],
+              ["Subtotal", fmt(grandSubtotal)],
+              ["Discount", `-${fmt(parseNum(discount))}`],
+              ["After Discount", fmt(afterDiscount)],
+              ["VAT 5%", fmt(vat)]
+            ].map(([k,v]) => (
               <div key={k} style={S.summaryRow(false)}><span>{k}</span><span>{v}</span></div>
             ))}
             <div style={S.summaryRow(true)}><span>Total Amount</span><span>{fmt(finalTotal)}</span></div>
@@ -324,7 +396,11 @@ export default function ProposalApp() {
         </div>
       </>}
 
-      {tab === "preview" && <PrintView />}
+      {tab === "preview" && <PDFContent />}
+
+      <div style={{ display: "none" }}>
+        <PDFContent />
+      </div>
     </div>
   );
 }
