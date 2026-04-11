@@ -1,5 +1,16 @@
 import { useState, useRef, useEffect, useCallback, memo } from "react";
 
+const C = {
+  primary: "#0078d4",
+  dark: "#005a9e",
+  darker: "#004578",
+  light: "#e8f4fc",
+  lighter: "#f0f8ff",
+  border: "#c7e0f4",
+  text: "#000",
+  white: "#fff",
+};
+
 const PRESET_ITEMS = {
   "Smart Automation": [
     { desc: "Intseer Smart Light Control Switch 4-line Multicolor", price: 250 },
@@ -53,45 +64,22 @@ const newItem = () => ({ id: uid(), desc: "", qty: "1", price: "0", image: null,
 const newSection = (name = "New Section") => ({ id: uid(), name, items: [newItem()] });
 const parseNum = v => parseFloat(v) || 0;
 const fmt = n => `AED ${Number(n).toLocaleString("en-AE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
 const SECTION_NAMES = ["Smart Automation", "Video Intercom", "CCTV System", "Sound System", "Network Structure", "Custom"];
 
-// Stable input that never loses focus
-const StableInput = memo(({ value, onChange, onBlur, style, placeholder, type = "text" }) => {
+const StableInput = memo(({ value, onChange, style, placeholder }) => {
   const [local, setLocal] = useState(value);
   const ref = useRef();
-  useEffect(() => {
-    if (document.activeElement !== ref.current) setLocal(value);
-  }, [value]);
-  return (
-    <input
-      ref={ref}
-      type={type}
-      value={local}
-      placeholder={placeholder}
-      style={style}
-      onChange={e => { setLocal(e.target.value); onChange(e.target.value); }}
-      onBlur={() => { onBlur && onBlur(local); }}
-    />
-  );
+  useEffect(() => { if (document.activeElement !== ref.current) setLocal(value); }, [value]);
+  return <input ref={ref} type="text" value={local} placeholder={placeholder} style={style}
+    onChange={e => { setLocal(e.target.value); onChange(e.target.value); }} />;
 });
 
 const StableTextarea = memo(({ value, onChange, rows, style, placeholder }) => {
   const [local, setLocal] = useState(value);
   const ref = useRef();
-  useEffect(() => {
-    if (document.activeElement !== ref.current) setLocal(value);
-  }, [value]);
-  return (
-    <textarea
-      ref={ref}
-      value={local}
-      rows={rows}
-      placeholder={placeholder}
-      style={style}
-      onChange={e => { setLocal(e.target.value); onChange(e.target.value); }}
-    />
-  );
+  useEffect(() => { if (document.activeElement !== ref.current) setLocal(value); }, [value]);
+  return <textarea ref={ref} value={local} rows={rows} placeholder={placeholder} style={style}
+    onChange={e => { setLocal(e.target.value); onChange(e.target.value); }} />;
 });
 
 const AutoImage = memo(({ src, onRemove }) => {
@@ -100,8 +88,7 @@ const AutoImage = memo(({ src, onRemove }) => {
     if (!src) return;
     const img = new Image();
     img.onload = () => {
-      const maxW = 150, maxH = 110;
-      const ratio = img.width / img.height;
+      const maxW = 150, maxH = 110, ratio = img.width / img.height;
       let w = img.width, h = img.height;
       if (w > maxW) { w = maxW; h = w / ratio; }
       if (h > maxH) { h = maxH; w = h * ratio; }
@@ -111,7 +98,7 @@ const AutoImage = memo(({ src, onRemove }) => {
   }, [src]);
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-      <img src={src} style={{ width: dims.w, height: dims.h, objectFit: "contain", borderRadius: 3, border: "1px solid #eee" }} alt="" />
+      <img src={src} style={{ width: dims.w, height: dims.h, objectFit: "contain", borderRadius: 3, border: `1px solid ${C.border}` }} alt="" />
       <button onClick={onRemove} style={{ background: "none", border: "none", color: "#c00", fontSize: 11, cursor: "pointer" }}>remove</button>
     </div>
   );
@@ -120,28 +107,20 @@ const AutoImage = memo(({ src, onRemove }) => {
 const QtyInput = memo(({ value, onCommit }) => {
   const [local, setLocal] = useState(value);
   const ref = useRef();
-  useEffect(() => {
-    if (document.activeElement !== ref.current) setLocal(value);
-  }, [value]);
+  useEffect(() => { if (document.activeElement !== ref.current) setLocal(value); }, [value]);
   const step = delta => {
     const next = Math.max(0, parseNum(local) + delta);
     const rounded = Math.round(next * 2) / 2;
-    setLocal(String(rounded));
-    onCommit(String(rounded));
+    setLocal(String(rounded)); onCommit(String(rounded));
   };
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-      <input
-        ref={ref}
-        type="text"
-        inputMode="decimal"
-        value={local}
+      <input ref={ref} type="text" inputMode="decimal" value={local}
         onChange={e => { setLocal(e.target.value); onCommit(e.target.value); }}
-        style={{ width: 80, padding: "6px 8px", border: "1px solid #ddd", borderRadius: 5, fontSize: 13, textAlign: "right", boxSizing: "border-box" }}
-      />
+        style={{ width: 80, padding: "6px 8px", border: `1px solid ${C.border}`, borderRadius: 4, fontSize: 13, textAlign: "right", boxSizing: "border-box" }} />
       <div style={{ display: "flex", gap: 2 }}>
-        <button onClick={() => step(-0.5)} style={{ flex: 1, fontSize: 15, padding: "2px 0", border: "1px solid #ddd", borderRadius: 3, background: "#f0f0f0", cursor: "pointer", fontWeight: 600 }}>−</button>
-        <button onClick={() => step(0.5)} style={{ flex: 1, fontSize: 15, padding: "2px 0", border: "1px solid #ddd", borderRadius: 3, background: "#f0f0f0", cursor: "pointer", fontWeight: 600 }}>+</button>
+        <button onClick={() => step(-0.5)} style={{ flex: 1, fontSize: 15, padding: "2px 0", border: `1px solid ${C.border}`, borderRadius: 3, background: C.light, cursor: "pointer", fontWeight: 600, color: C.primary }}>−</button>
+        <button onClick={() => step(0.5)} style={{ flex: 1, fontSize: 15, padding: "2px 0", border: `1px solid ${C.border}`, borderRadius: 3, background: C.light, cursor: "pointer", fontWeight: 600, color: C.primary }}>+</button>
       </div>
     </div>
   );
@@ -151,12 +130,8 @@ const ItemRow = memo(({ sec, it, idx, onUpdate, onRemove, onImage }) => {
   const presets = PRESET_ITEMS[sec.name] || [];
   const total = parseNum(it.qty) * parseNum(it.price);
   const fileRef = useRef();
-
-  const td = { padding: "8px 10px", fontSize: 13, verticalAlign: "middle", borderBottom: "1px solid #ddd" };
-  const th = { background: "#2d6a4f", color: "#fff", padding: "9px 10px", textAlign: "left", fontSize: 12, fontWeight: 600, borderBottom: "2px solid #1a4a32", whiteSpace: "nowrap" };
-  const numInput = { width: "100%", padding: "7px 8px", border: "1px solid #ddd", borderRadius: 5, fontSize: 13, boxSizing: "border-box", textAlign: "right" };
-  const inp = { width: "100%", padding: "7px 10px", border: "1px solid #ddd", borderRadius: 5, fontSize: 13, boxSizing: "border-box" };
-
+  const td = { padding: "8px 10px", fontSize: 13, verticalAlign: "middle", borderBottom: `1px solid ${C.border}` };
+  const inp = { width: "100%", padding: "7px 10px", border: `1px solid ${C.border}`, borderRadius: 4, fontSize: 13, boxSizing: "border-box" };
   return (
     <tr>
       <td style={{ ...td, textAlign: "center", width: 36, fontWeight: 600 }}>{idx + 1}</td>
@@ -165,9 +140,9 @@ const ItemRow = memo(({ sec, it, idx, onUpdate, onRemove, onImage }) => {
           {it.image
             ? <AutoImage src={it.image} onRemove={() => onUpdate(it.id, "image", null)} />
             : <div onClick={() => fileRef.current.click()}
-                style={{ width: 70, height: 70, border: "2px dashed #bbb", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#aaa", fontSize: 28 }}>+</div>
+                style={{ width: 70, height: 70, border: `2px dashed ${C.border}`, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: C.primary, fontSize: 28 }}>+</div>
           }
-          {!it.image && <button onClick={() => fileRef.current.click()} style={{ fontSize: 11, color: "#2d6a4f", background: "none", border: "none", cursor: "pointer" }}>Upload</button>}
+          {!it.image && <button onClick={() => fileRef.current.click()} style={{ fontSize: 11, color: C.primary, background: "none", border: "none", cursor: "pointer" }}>Upload</button>}
           <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => onImage(it.id, e.target.files[0])} />
         </div>
       </td>
@@ -184,28 +159,17 @@ const ItemRow = memo(({ sec, it, idx, onUpdate, onRemove, onImage }) => {
             <option value="__custom__">Custom (type below)</option>
           </select>
         )}
-        <StableTextarea
-          value={it.desc}
-          onChange={v => onUpdate(it.id, "desc", v)}
-          rows={2}
-          placeholder="Item description..."
-          style={{ ...inp, resize: "vertical", fontSize: 12 }}
-        />
+        <StableTextarea value={it.desc} onChange={v => onUpdate(it.id, "desc", v)} rows={2}
+          placeholder="Item description..." style={{ ...inp, resize: "vertical", fontSize: 12 }} />
       </td>
-      <td style={{ ...td, width: 100 }}>
-        <QtyInput value={it.qty} onCommit={v => onUpdate(it.id, "qty", v)} />
-      </td>
+      <td style={{ ...td, width: 100 }}><QtyInput value={it.qty} onCommit={v => onUpdate(it.id, "qty", v)} /></td>
       <td style={{ ...td, width: 130 }}>
-        <StableInput
-          value={it.price}
-          onChange={v => onUpdate(it.id, "price", v)}
-          placeholder="0.00"
-          style={numInput}
-        />
+        <StableInput value={it.price} onChange={v => onUpdate(it.id, "price", v)} placeholder="0.00"
+          style={{ ...inp, textAlign: "right" }} />
       </td>
-      <td style={{ ...td, width: 140, textAlign: "right", fontWeight: 600, color: "#1a4a32" }}>{fmt(total)}</td>
+      <td style={{ ...td, width: 140, textAlign: "right", fontWeight: 600, color: C.darker }}>{fmt(total)}</td>
       <td style={{ ...td, width: 36, textAlign: "center" }}>
-        <button onClick={() => onRemove(it.id)} style={{ background: "transparent", border: "none", cursor: "pointer", color: "#c00", fontSize: 18 }} title="Remove">×</button>
+        <button onClick={() => onRemove(it.id)} style={{ background: "transparent", border: "none", cursor: "pointer", color: "#c00", fontSize: 18 }}>×</button>
       </td>
     </tr>
   );
@@ -213,15 +177,10 @@ const ItemRow = memo(({ sec, it, idx, onUpdate, onRemove, onImage }) => {
 
 export default function ProposalApp() {
   const [header, setHeader] = useState({
-    project: "", location: "",
-    date: new Date().toISOString().slice(0, 10),
-    ref: "",
-    client: "",
-    company: "Zettanet Technologies",
-    companyEmail: "info@zettanet.tech",
-    companyAddress: "P.O. Box: 114345, Abu Dhabi, UAE",
-    slogan: "Smart Solutions for Modern Living",
-    logo: null
+    project: "", location: "", date: new Date().toISOString().slice(0, 10),
+    ref: "", client: "", company: "Zettanet Technologies",
+    companyEmail: "info@zettanet.tech", companyAddress: "P.O. Box: 114345, Abu Dhabi, UAE",
+    slogan: "Smart Solutions for Modern Living", logo: null
   });
   const [sections, setSections] = useState([
     { id: 1, name: "Smart Automation", items: [newItem(), newItem()] },
@@ -232,14 +191,13 @@ export default function ProposalApp() {
   ]);
   const [installation, setInstallation] = useState("0");
   const [discount, setDiscount] = useState("0");
-  const [discountType, setDiscountType] = useState("lumpsum"); // "lumpsum" or "percent"
+  const [discountType, setDiscountType] = useState("lumpsum");
   const [terms, setTerms] = useState(DEFAULT_TERMS);
   const [tab, setTab] = useState("edit");
   const [pdfLoading, setPdfLoading] = useState(false);
   const logoRef = useRef();
 
   const updateHeader = useCallback((k, v) => setHeader(h => ({ ...h, [k]: v })), []);
-
   const handleLogoUpload = file => {
     if (!file) return;
     const r = new FileReader();
@@ -286,9 +244,9 @@ export default function ProposalApp() {
   useEffect(() => {
     const style = document.createElement("style");
     style.id = "no-print-style";
-    style.innerHTML = `@media print { .no-print { display: none !important; } body > * .no-print { display: none !important; } }`;
+    style.innerHTML = `@media print { .no-print { display: none !important; } }`;
     document.head.appendChild(style);
-    return () => { const el = document.getElementById("no-print-style"); if(el) el.remove(); };
+    return () => { const el = document.getElementById("no-print-style"); if (el) el.remove(); };
   }, []);
 
   const handlePrint = () => {
@@ -312,36 +270,43 @@ export default function ProposalApp() {
       const el = document.getElementById("pdf-content");
       await window.html2pdf().set({
         margin: [8, 8, 8, 8],
-        filename: `Zettanet-Proposal-${header.client}-${header.date}.pdf`,
+        filename: `Zettanet-Proposal-${header.client || "Client"}-${header.date}.pdf`,
         image: { type: "jpeg", quality: 1 },
         html2canvas: { scale: 3, useCORS: true, letterRendering: true },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
       }).from(el).save();
-    } catch (e) {
-      alert("PDF export failed. Use Print → Save as PDF instead.");
-    }
+    } catch (e) { alert("PDF export failed. Use Print → Save as PDF instead."); }
     setPdfLoading(false);
   };
 
   const S = {
-    card: { background: "#fff", border: "1px solid #e0e0e0", borderRadius: 8, padding: 20, marginBottom: 20 },
+    card: { background: "#fff", border: `1px solid ${C.border}`, borderRadius: 8, padding: 20, marginBottom: 20 },
     label: { fontSize: 12, color: "#555", display: "block", marginBottom: 4, fontWeight: 500 },
-    input: { width: "100%", padding: "7px 10px", border: "1px solid #ddd", borderRadius: 5, fontSize: 13, boxSizing: "border-box" },
-    btn: (c = "#2d6a4f") => ({ background: c, color: "#fff", border: "none", borderRadius: 5, padding: "6px 14px", cursor: "pointer", fontSize: 13 }),
-    tabBtn: a => ({ padding: "8px 20px", border: "1px solid #ccc", borderRadius: 6, cursor: "pointer", background: a ? "#2d6a4f" : "#fff", color: a ? "#fff" : "#333", fontWeight: a ? 600 : 400 }),
-    summaryRow: b => ({ display: "flex", justifyContent: "space-between", padding: "6px 0", fontWeight: b ? 700 : 400, fontSize: b ? 15 : 13, borderTop: b ? "2px solid #2d6a4f" : "1px solid #eee", color: b ? "#2d6a4f" : "inherit" }),
+    input: { width: "100%", padding: "7px 10px", border: `1px solid ${C.border}`, borderRadius: 4, fontSize: 13, boxSizing: "border-box" },
+    btn: (bg = C.primary) => ({ background: bg, color: "#fff", border: "none", borderRadius: 4, padding: "6px 16px", cursor: "pointer", fontSize: 13, fontWeight: 500 }),
+    tabBtn: a => ({ padding: "8px 20px", border: `1px solid ${C.border}`, borderRadius: 4, cursor: "pointer", background: a ? C.primary : "#fff", color: a ? "#fff" : "#333", fontWeight: a ? 600 : 400 }),
+    summaryRow: b => ({ display: "flex", justifyContent: "space-between", padding: "6px 0", fontWeight: b ? 700 : 400, fontSize: b ? 15 : 13, borderTop: b ? `2px solid ${C.primary}` : `1px solid ${C.border}`, color: b ? C.primary : "inherit" }),
+    th: { background: C.primary, color: "#fff", padding: "9px 10px", textAlign: "left", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" },
   };
+
+  const summaryRows = [
+    ["Sections Subtotal", fmt(allSectionTotal)],
+    ...(parseNum(installation) > 0 ? [["Installation & Configuration", fmt(parseNum(installation))]] : []),
+    ...((parseNum(installation) > 0 || discountAmount > 0) ? [["Subtotal", fmt(grandSubtotal)]] : []),
+    ...(discountAmount > 0 ? [["Discount", `-${fmt(discountAmount)}`], ["After Discount", fmt(afterDiscount)]] : []),
+    ["VAT 5%", fmt(vat)],
+  ];
 
   const PDFContent = () => (
     <div id="pdf-content" style={{ fontFamily: "Arial, sans-serif", padding: 28, fontSize: 12, color: "#000", background: "#fff", maxWidth: 900 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, borderBottom: "3px solid #2d6a4f", paddingBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, borderBottom: `3px solid ${C.primary}`, paddingBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           {header.logo
             ? <img src={header.logo} style={{ height: 70, objectFit: "contain" }} alt="logo" />
-            : <div style={{ width: 70, height: 70, background: "#2d6a4f", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 18 }}>ZN</div>
+            : <div style={{ width: 70, height: 70, background: C.primary, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 18 }}>ZN</div>
           }
           <div>
-            <div style={{ fontWeight: 700, fontSize: 18, color: "#2d6a4f" }}>{header.company}</div>
+            <div style={{ fontWeight: 700, fontSize: 18, color: C.primary }}>{header.company}</div>
             <div style={{ fontSize: 11, color: "#555", fontStyle: "italic", marginTop: 2 }}>{header.slogan}</div>
             <div style={{ fontSize: 11, color: "#333", marginTop: 4 }}>{header.companyAddress}</div>
             <div style={{ fontSize: 11, color: "#333" }}>E: {header.companyEmail}</div>
@@ -349,41 +314,41 @@ export default function ProposalApp() {
         </div>
         <div style={{ textAlign: "right", fontSize: 11, color: "#333", lineHeight: 1.9 }}>
           <div><b>Date:</b> {header.date}</div>
-          <div><b>Ref:</b> {header.ref}</div>
-          <div><b>Project:</b> {header.project}</div>
-          <div><b>Location:</b> {header.location}</div>
-          <div><b>Client:</b> {header.client}</div>
+          {header.ref && <div><b>Ref:</b> {header.ref}</div>}
+          {header.project && <div><b>Project:</b> {header.project}</div>}
+          {header.location && <div><b>Location:</b> {header.location}</div>}
+          {header.client && <div><b>Client:</b> {header.client}</div>}
         </div>
       </div>
 
       {sections.map(sec => (
         <div key={sec.id} style={{ marginBottom: 22 }}>
-          <div style={{ background: "#2d6a4f", color: "#fff", padding: "7px 12px", fontWeight: 700, fontSize: 13, borderRadius: "4px 4px 0 0" }}>{sec.name}</div>
-          <table style={{ width: "100%", borderCollapse: "collapse", border: "1.5px solid #2d6a4f" }}>
+          <div style={{ background: C.primary, color: "#fff", padding: "7px 12px", fontWeight: 700, fontSize: 13, borderRadius: "4px 4px 0 0" }}>{sec.name}</div>
+          <table style={{ width: "100%", borderCollapse: "collapse", border: `1.5px solid ${C.primary}` }}>
             <thead>
               <tr>{["SN", "Photo", "Item Description", "QTY", "Unit Price (AED)", "Total"].map(h => (
-                <th key={h} style={{ background: "#e8f0e9", padding: "7px 9px", textAlign: "left", fontSize: 11, fontWeight: 700, borderBottom: "1.5px solid #2d6a4f", borderRight: "1px solid #ccc", color: "#000" }}>{h}</th>
+                <th key={h} style={{ background: C.light, padding: "7px 9px", textAlign: "left", fontSize: 11, fontWeight: 700, borderBottom: `1.5px solid ${C.primary}`, borderRight: `1px solid ${C.border}`, color: "#000" }}>{h}</th>
               ))}</tr>
             </thead>
             <tbody>
               {sec.items.map((it, i) => {
                 const tot = parseNum(it.qty) * parseNum(it.price);
                 return (
-                  <tr key={it.id} style={{ background: i % 2 === 0 ? "#fff" : "#f9f9f9" }}>
-                    <td style={{ padding: "6px 9px", border: "1px solid #ccc", textAlign: "center", width: 30, fontWeight: 600 }}>{i + 1}</td>
-                    <td style={{ padding: "4px 8px", border: "1px solid #ccc", textAlign: "center", width: 90 }}>
+                  <tr key={it.id} style={{ background: i % 2 === 0 ? "#fff" : C.lighter }}>
+                    <td style={{ padding: "6px 9px", border: `1px solid ${C.border}`, textAlign: "center", width: 30, fontWeight: 600 }}>{i + 1}</td>
+                    <td style={{ padding: "4px 8px", border: `1px solid ${C.border}`, textAlign: "center", width: 90 }}>
                       {it.image && <img src={it.image} style={{ maxWidth: 80, maxHeight: 70, objectFit: "contain" }} alt="" />}
                     </td>
-                    <td style={{ padding: "6px 9px", border: "1px solid #ccc", fontSize: 11 }}>{it.desc}</td>
-                    <td style={{ padding: "6px 9px", border: "1px solid #ccc", textAlign: "center", width: 50 }}>{it.qty}</td>
-                    <td style={{ padding: "6px 9px", border: "1px solid #ccc", textAlign: "right", width: 90 }}>{parseNum(it.price).toFixed(2)}</td>
-                    <td style={{ padding: "6px 9px", border: "1px solid #ccc", textAlign: "right", fontWeight: 700, width: 110 }}>{fmt(tot)}</td>
+                    <td style={{ padding: "6px 9px", border: `1px solid ${C.border}`, fontSize: 11 }}>{it.desc}</td>
+                    <td style={{ padding: "6px 9px", border: `1px solid ${C.border}`, textAlign: "center", width: 50 }}>{it.qty}</td>
+                    <td style={{ padding: "6px 9px", border: `1px solid ${C.border}`, textAlign: "right", width: 90 }}>{parseNum(it.price).toFixed(2)}</td>
+                    <td style={{ padding: "6px 9px", border: `1px solid ${C.border}`, textAlign: "right", fontWeight: 700, width: 110 }}>{fmt(tot)}</td>
                   </tr>
                 );
               })}
               <tr>
-                <td colSpan={5} style={{ textAlign: "right", padding: "7px 9px", background: "#2d6a4f", color: "#fff", fontWeight: 700, border: "1px solid #2d6a4f" }}>Section Total</td>
-                <td style={{ textAlign: "right", padding: "7px 9px", background: "#2d6a4f", color: "#fff", fontWeight: 700, border: "1px solid #2d6a4f" }}>{fmt(secTotal(sec))}</td>
+                <td colSpan={5} style={{ textAlign: "right", padding: "7px 9px", background: C.primary, color: "#fff", fontWeight: 700, border: `1px solid ${C.primary}` }}>Section Total</td>
+                <td style={{ textAlign: "right", padding: "7px 9px", background: C.primary, color: "#fff", fontWeight: 700, border: `1px solid ${C.primary}` }}>{fmt(secTotal(sec))}</td>
               </tr>
             </tbody>
           </table>
@@ -391,56 +356,49 @@ export default function ProposalApp() {
       ))}
 
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 24 }}>
-        <table style={{ width: 380, borderCollapse: "collapse", border: "1.5px solid #2d6a4f" }}>
-          {[
-            ["Sections Subtotal", fmt(allSectionTotal)],
-            ...(parseNum(installation) > 0 ? [["Installation & Configuration", fmt(parseNum(installation))]] : []),
-            ...((parseNum(installation) > 0 || parseNum(discount) > 0) ? [["Subtotal", fmt(grandSubtotal)]] : []),
-            ...(discountAmount > 0 ? [["Discount", `-${fmt(discountAmount)}`], ["After Discount", fmt(afterDiscount)]] : []),
-            ["VAT 5%", fmt(vat)]
-          ].map(([k, v]) => (
+        <table style={{ width: 380, borderCollapse: "collapse", border: `1.5px solid ${C.primary}` }}>
+          {summaryRows.map(([k, v]) => (
             <tr key={k}>
-              <td style={{ padding: "5px 10px", fontSize: 11, borderBottom: "1px solid #ddd" }}>{k}</td>
-              <td style={{ padding: "5px 10px", textAlign: "right", fontSize: 11, borderBottom: "1px solid #ddd" }}>{v}</td>
+              <td style={{ padding: "5px 10px", fontSize: 11, borderBottom: `1px solid ${C.border}` }}>{k}</td>
+              <td style={{ padding: "5px 10px", textAlign: "right", fontSize: 11, borderBottom: `1px solid ${C.border}` }}>{v}</td>
             </tr>
           ))}
           <tr>
-            <td style={{ padding: "9px 10px", fontWeight: 700, background: "#2d6a4f", color: "#fff", fontSize: 13 }}>Total Amount</td>
-            <td style={{ padding: "9px 10px", fontWeight: 700, textAlign: "right", background: "#2d6a4f", color: "#fff", fontSize: 13 }}>{fmt(finalTotal)}</td>
+            <td style={{ padding: "9px 10px", fontWeight: 700, background: C.primary, color: "#fff", fontSize: 13 }}>Total Amount</td>
+            <td style={{ padding: "9px 10px", fontWeight: 700, textAlign: "right", background: C.primary, color: "#fff", fontSize: 13 }}>{fmt(finalTotal)}</td>
           </tr>
         </table>
       </div>
-      <div style={{ whiteSpace: "pre-wrap", fontSize: 11, color: "#000", borderTop: "2px solid #2d6a4f", paddingTop: 14, lineHeight: 1.7 }}>{terms}</div>
+      <div style={{ whiteSpace: "pre-wrap", fontSize: 11, color: "#000", borderTop: `2px solid ${C.primary}`, paddingTop: 14, lineHeight: 1.7 }}>{terms}</div>
     </div>
   );
 
   return (
     <div style={{ fontFamily: "sans-serif", maxWidth: 980, margin: "0 auto", padding: "0 0 60px" }}>
-      <div className="no-print" style={{ background: "#2d6a4f", color: "#fff", padding: "16px 24px", borderRadius: 8, marginBottom: 20, display: "flex", alignItems: "center", gap: 16 }}>
+      <div className="no-print" style={{ background: C.primary, color: "#fff", padding: "16px 24px", borderRadius: 8, marginBottom: 20, display: "flex", alignItems: "center", gap: 16 }}>
         {header.logo
           ? <img src={header.logo} style={{ height: 50, objectFit: "contain", borderRadius: 4, background: "#fff", padding: 4 }} alt="logo" />
           : <div style={{ width: 50, height: 50, background: "rgba(255,255,255,0.2)", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 16 }}>ZN</div>
         }
         <div>
           <div style={{ fontSize: 20, fontWeight: 600 }}>Zettanet Technologies — Proposal Generator</div>
-          <div style={{ fontSize: 12, opacity: 0.8, fontStyle: "italic" }}>{header.slogan}</div>
+          <div style={{ fontSize: 12, opacity: 0.85, fontStyle: "italic" }}>{header.slogan}</div>
         </div>
       </div>
 
       <div className="no-print" style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-
         {["edit", "preview"].map(t => <button key={t} onClick={() => setTab(t)} style={S.tabBtn(tab === t)}>{t === "edit" ? "Edit Proposal" : "Preview"}</button>)}
         <button onClick={handlePrint} style={S.btn("#444")}>Print</button>
-        <button onClick={handleExportPDF} disabled={pdfLoading} style={{ ...S.btn("#1a4a32"), opacity: pdfLoading ? 0.7 : 1 }}>{pdfLoading ? "Generating..." : "Export PDF"}</button>
+        <button onClick={handleExportPDF} disabled={pdfLoading} style={{ ...S.btn(C.darker), opacity: pdfLoading ? 0.7 : 1 }}>{pdfLoading ? "Generating..." : "Export PDF"}</button>
       </div>
 
       {tab === "edit" && <>
         <div style={S.card}>
-          <div style={{ fontWeight: 600, marginBottom: 14, color: "#2d6a4f", fontSize: 15 }}>Company & Proposal Header</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 16, padding: 14, background: "#f5f9f5", borderRadius: 6, border: "1px solid #d0e8d0", marginBottom: 14 }}>
+          <div style={{ fontWeight: 600, marginBottom: 14, color: C.primary, fontSize: 15 }}>Company & Proposal Header</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, padding: 14, background: C.lighter, borderRadius: 6, border: `1px solid ${C.border}`, marginBottom: 14 }}>
             {header.logo
-              ? <img src={header.logo} style={{ height: 70, objectFit: "contain", borderRadius: 4, border: "1px solid #ddd" }} alt="logo" />
-              : <div style={{ width: 70, height: 70, background: "#e8f0e9", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", color: "#2d6a4f", fontWeight: 700, fontSize: 20 }}>ZN</div>
+              ? <img src={header.logo} style={{ height: 70, objectFit: "contain", borderRadius: 4, border: `1px solid ${C.border}` }} alt="logo" />
+              : <div style={{ width: 70, height: 70, background: C.light, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", color: C.primary, fontWeight: 700, fontSize: 20 }}>ZN</div>
             }
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <button onClick={() => logoRef.current.click()} style={S.btn()}>Upload Logo</button>
@@ -464,8 +422,8 @@ export default function ProposalApp() {
         </div>
 
         {sections.map(sec => (
-          <div key={sec.id} style={{ border: "1.5px solid #2d6a4f", borderRadius: 8, marginBottom: 20, overflow: "hidden" }}>
-            <div style={{ background: "#2d6a4f", color: "#fff", padding: "9px 14px", fontWeight: 600, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div key={sec.id} style={{ border: `1.5px solid ${C.primary}`, borderRadius: 8, marginBottom: 20, overflow: "hidden" }}>
+            <div style={{ background: C.primary, color: "#fff", padding: "9px 14px", fontWeight: 600, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <select value={SECTION_NAMES.includes(sec.name) ? sec.name : "Custom"}
                   onChange={e => { if (e.target.value !== "Custom") updateSecName(sec.id, e.target.value); }}
@@ -481,68 +439,60 @@ export default function ProposalApp() {
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr>{["SN", "Photo", "Item Description", "QTY (±0.5)", "Unit Price (AED)", "Total", ""].map(h => (
-                    <th key={h} style={{ background: "#2d6a4f", color: "#fff", padding: "9px 10px", textAlign: "left", fontSize: 12, fontWeight: 600, borderBottom: "2px solid #1a4a32", whiteSpace: "nowrap" }}>{h}</th>
+                    <th key={h} style={S.th}>{h}</th>
                   ))}</tr>
                 </thead>
                 <tbody>
                   {sec.items.map((it, i) => (
-                    <ItemRow
-                      key={it.id} sec={sec} it={it} idx={i}
+                    <ItemRow key={it.id} sec={sec} it={it} idx={i}
                       onUpdate={(itemId, field, value) => updateItem(sec.id, itemId, field, value)}
                       onRemove={itemId => removeItem(sec.id, itemId)}
-                      onImage={(itemId, file) => handleImage(sec.id, itemId, file)}
-                    />
+                      onImage={(itemId, file) => handleImage(sec.id, itemId, file)} />
                   ))}
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td colSpan={5} style={{ textAlign: "right", padding: "7px 10px", background: "#2d6a4f", color: "#fff", fontWeight: 700, fontSize: 13 }}>Section Total</td>
-                    <td style={{ textAlign: "right", padding: "7px 10px", background: "#2d6a4f", color: "#fff", fontWeight: 700, fontSize: 13 }}>{fmt(secTotal(sec))}</td>
-                    <td style={{ background: "#2d6a4f" }}></td>
+                    <td colSpan={5} style={{ textAlign: "right", padding: "7px 10px", background: C.primary, color: "#fff", fontWeight: 700, fontSize: 13 }}>Section Total</td>
+                    <td style={{ textAlign: "right", padding: "7px 10px", background: C.primary, color: "#fff", fontWeight: 700, fontSize: 13 }}>{fmt(secTotal(sec))}</td>
+                    <td style={{ background: C.primary }}></td>
                   </tr>
                 </tfoot>
               </table>
             </div>
-            <div style={{ padding: "10px 14px", background: "#f5f9f5", borderTop: "1px solid #ddd" }}>
+            <div style={{ padding: "10px 14px", background: C.lighter, borderTop: `1px solid ${C.border}` }}>
               <button onClick={() => addItem(sec.id)} style={S.btn()}>+ Add Item</button>
             </div>
           </div>
         ))}
 
         <div style={{ marginBottom: 20 }}>
-          <button onClick={addSection} style={{ ...S.btn("#1a4a32"), padding: "10px 24px", fontSize: 14 }}>+ Add Section</button>
+          <button onClick={addSection} style={{ ...S.btn(C.dark), padding: "10px 24px", fontSize: 14 }}>+ Add Section</button>
         </div>
 
         <div style={S.card}>
-          <div style={{ fontWeight: 600, marginBottom: 14, color: "#2d6a4f", fontSize: 15 }}>Summary</div>
+          <div style={{ fontWeight: 600, marginBottom: 14, color: C.primary, fontSize: 15 }}>Summary</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
             <div>
               <label style={S.label}>Installation / Programming / Configuration (AED)</label>
-              <StableInput value={installation} onChange={setInstallation} style={{ ...S.input, textAlign: "right" }} />
+              <StableInput value={installation} onChange={setInstallation} style={{ ...S.input, textAlign: "right" }} placeholder="0" />
             </div>
             <div>
               <label style={S.label}>Discount</label>
               <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
-                <button onClick={() => setDiscountType("lumpsum")} style={{ flex: 1, padding: "5px 0", border: "1px solid #ddd", borderRadius: 5, cursor: "pointer", background: discountType === "lumpsum" ? "#2d6a4f" : "#f5f5f5", color: discountType === "lumpsum" ? "#fff" : "#333", fontSize: 12, fontWeight: 500 }}>AED (Lump sum)</button>
-                <button onClick={() => setDiscountType("percent")} style={{ flex: 1, padding: "5px 0", border: "1px solid #ddd", borderRadius: 5, cursor: "pointer", background: discountType === "percent" ? "#2d6a4f" : "#f5f5f5", color: discountType === "percent" ? "#fff" : "#333", fontSize: 12, fontWeight: 500 }}>% Percentage</button>
+                <button onClick={() => setDiscountType("lumpsum")} style={{ flex: 1, padding: "5px 0", border: `1px solid ${C.border}`, borderRadius: 4, cursor: "pointer", background: discountType === "lumpsum" ? C.primary : C.lighter, color: discountType === "lumpsum" ? "#fff" : "#333", fontSize: 12, fontWeight: 500 }}>AED Lump sum</button>
+                <button onClick={() => setDiscountType("percent")} style={{ flex: 1, padding: "5px 0", border: `1px solid ${C.border}`, borderRadius: 4, cursor: "pointer", background: discountType === "percent" ? C.primary : C.lighter, color: discountType === "percent" ? "#fff" : "#333", fontSize: 12, fontWeight: 500 }}>% Percentage</button>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <StableInput value={discount} onChange={setDiscount} style={{ ...S.input, textAlign: "right" }} placeholder="0" />
                 <span style={{ fontSize: 13, color: "#555", whiteSpace: "nowrap" }}>{discountType === "percent" ? "%" : "AED"}</span>
               </div>
               {discountType === "percent" && parseNum(discount) > 0 && (
-                <div style={{ fontSize: 12, color: "#2d6a4f", marginTop: 4 }}>= {fmt(discountAmount)} off</div>
+                <div style={{ fontSize: 12, color: C.primary, marginTop: 4 }}>= {fmt(discountAmount)} off</div>
               )}
             </div>
           </div>
-          <div style={{ background: "#f5f9f5", border: "1.5px solid #2d6a4f", borderRadius: 6, padding: "14px 18px" }}>
-            {[
-              ["Sections Subtotal", fmt(allSectionTotal)],
-              ["Installation & Configuration", fmt(parseNum(installation))],
-              ["Subtotal", fmt(grandSubtotal)],
-              ...(discountAmount > 0 ? [["Discount", `-${fmt(discountAmount)}`], ["After Discount", fmt(afterDiscount)]] : []),
-              ["VAT 5%", fmt(vat)]
-            ].map(([k, v]) => (
+          <div style={{ background: C.lighter, border: `1.5px solid ${C.primary}`, borderRadius: 6, padding: "14px 18px" }}>
+            {summaryRows.map(([k, v]) => (
               <div key={k} style={S.summaryRow(false)}><span>{k}</span><span>{v}</span></div>
             ))}
             <div style={S.summaryRow(true)}><span>Total Amount</span><span>{fmt(finalTotal)}</span></div>
@@ -550,7 +500,7 @@ export default function ProposalApp() {
         </div>
 
         <div style={S.card}>
-          <div style={{ fontWeight: 600, marginBottom: 10, color: "#2d6a4f", fontSize: 15 }}>Terms & Conditions</div>
+          <div style={{ fontWeight: 600, marginBottom: 10, color: C.primary, fontSize: 15 }}>Terms & Conditions</div>
           <StableTextarea value={terms} onChange={setTerms} rows={12} style={{ ...S.input, fontFamily: "inherit", lineHeight: 1.7 }} />
         </div>
       </>}
