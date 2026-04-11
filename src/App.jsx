@@ -281,6 +281,21 @@ export default function ProposalApp() {
   const vat = afterDiscount * 0.05;
   const finalTotal = afterDiscount + vat;
 
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.id = "no-print-style";
+    style.innerHTML = `@media print { .no-print { display: none !important; } body > * .no-print { display: none !important; } }`;
+    document.head.appendChild(style);
+    return () => { const el = document.getElementById("no-print-style"); if(el) el.remove(); };
+  }, []);
+
+  const handlePrint = () => {
+    const els = document.querySelectorAll(".no-print");
+    els.forEach(el => el.style.display = "none");
+    window.print();
+    setTimeout(() => els.forEach(el => el.style.display = ""), 1000);
+  };
+
   const handleExportPDF = async () => {
     setPdfLoading(true);
     try {
@@ -393,7 +408,7 @@ export default function ProposalApp() {
 
   return (
     <div style={{ fontFamily: "sans-serif", maxWidth: 980, margin: "0 auto", padding: "0 0 60px" }}>
-      <div style={{ background: "#2d6a4f", color: "#fff", padding: "16px 24px", borderRadius: 8, marginBottom: 20, display: "flex", alignItems: "center", gap: 16 }}>
+      <div className="no-print" style={{ background: "#2d6a4f", color: "#fff", padding: "16px 24px", borderRadius: 8, marginBottom: 20, display: "flex", alignItems: "center", gap: 16 }}>
         {header.logo
           ? <img src={header.logo} style={{ height: 50, objectFit: "contain", borderRadius: 4, background: "#fff", padding: 4 }} alt="logo" />
           : <div style={{ width: 50, height: 50, background: "rgba(255,255,255,0.2)", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 16 }}>ZN</div>
@@ -404,9 +419,10 @@ export default function ProposalApp() {
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+      <div className="no-print" style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+
         {["edit", "preview"].map(t => <button key={t} onClick={() => setTab(t)} style={S.tabBtn(tab === t)}>{t === "edit" ? "Edit Proposal" : "Preview"}</button>)}
-        <button onClick={() => window.print()} style={S.btn("#444")}>Print</button>
+        <button onClick={handlePrint} style={S.btn("#444")}>Print</button>
         <button onClick={handleExportPDF} disabled={pdfLoading} style={{ ...S.btn("#1a4a32"), opacity: pdfLoading ? 0.7 : 1 }}>{pdfLoading ? "Generating..." : "Export PDF"}</button>
       </div>
 
@@ -515,7 +531,12 @@ export default function ProposalApp() {
         </div>
       </>}
 
-      {tab === "preview" && <PDFContent />}
+      {tab === "preview" && (
+        <>
+          <style>{`@media print { .no-print { display: none !important; } }`}</style>
+          <PDFContent />
+        </>
+      )}
       <div style={{ position: "absolute", left: -9999, top: 0, visibility: "hidden" }}><PDFContent /></div>
     </div>
   );
