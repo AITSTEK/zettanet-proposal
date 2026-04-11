@@ -213,10 +213,10 @@ const ItemRow = memo(({ sec, it, idx, onUpdate, onRemove, onImage }) => {
 
 export default function ProposalApp() {
   const [header, setHeader] = useState({
-    project: "", location: "Abu Dhabi",
+    project: "", location: "",
     date: new Date().toISOString().slice(0, 10),
-    ref: "LTR-ZT-HIM-BOR-14102024004-00",
-    client: "Mr. Saeed",
+    ref: "",
+    client: "",
     company: "Zettanet Technologies",
     companyEmail: "info@zettanet.tech",
     companyAddress: "P.O. Box: 114345, Abu Dhabi, UAE",
@@ -232,6 +232,7 @@ export default function ProposalApp() {
   ]);
   const [installation, setInstallation] = useState("0");
   const [discount, setDiscount] = useState("0");
+  const [discountType, setDiscountType] = useState("lumpsum"); // "lumpsum" or "percent"
   const [terms, setTerms] = useState(DEFAULT_TERMS);
   const [tab, setTab] = useState("edit");
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -277,7 +278,8 @@ export default function ProposalApp() {
   const secTotal = sec => sec.items.reduce((sum, it) => sum + parseNum(it.qty) * parseNum(it.price), 0);
   const allSectionTotal = sections.reduce((sum, sec) => sum + secTotal(sec), 0);
   const grandSubtotal = allSectionTotal + parseNum(installation);
-  const afterDiscount = grandSubtotal - parseNum(discount);
+  const discountAmount = discountType === "percent" ? grandSubtotal * (parseNum(discount) / 100) : parseNum(discount);
+  const afterDiscount = grandSubtotal - discountAmount;
   const vat = afterDiscount * 0.05;
   const finalTotal = afterDiscount + vat;
 
@@ -394,7 +396,7 @@ export default function ProposalApp() {
             ["Sections Subtotal", fmt(allSectionTotal)],
             ...(parseNum(installation) > 0 ? [["Installation & Configuration", fmt(parseNum(installation))]] : []),
             ...((parseNum(installation) > 0 || parseNum(discount) > 0) ? [["Subtotal", fmt(grandSubtotal)]] : []),
-            ...(parseNum(discount) > 0 ? [["Discount", `-${fmt(parseNum(discount))}`], ["After Discount", fmt(afterDiscount)]] : []),
+            ...(discountAmount > 0 ? [["Discount", `-${fmt(discountAmount)}`], ["After Discount", fmt(afterDiscount)]] : []),
             ["VAT 5%", fmt(vat)]
           ].map(([k, v]) => (
             <tr key={k}>
@@ -519,8 +521,18 @@ export default function ProposalApp() {
               <StableInput value={installation} onChange={setInstallation} style={{ ...S.input, textAlign: "right" }} />
             </div>
             <div>
-              <label style={S.label}>Discount (AED)</label>
-              <StableInput value={discount} onChange={setDiscount} style={{ ...S.input, textAlign: "right" }} />
+              <label style={S.label}>Discount</label>
+              <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+                <button onClick={() => setDiscountType("lumpsum")} style={{ flex: 1, padding: "5px 0", border: "1px solid #ddd", borderRadius: 5, cursor: "pointer", background: discountType === "lumpsum" ? "#2d6a4f" : "#f5f5f5", color: discountType === "lumpsum" ? "#fff" : "#333", fontSize: 12, fontWeight: 500 }}>AED (Lump sum)</button>
+                <button onClick={() => setDiscountType("percent")} style={{ flex: 1, padding: "5px 0", border: "1px solid #ddd", borderRadius: 5, cursor: "pointer", background: discountType === "percent" ? "#2d6a4f" : "#f5f5f5", color: discountType === "percent" ? "#fff" : "#333", fontSize: 12, fontWeight: 500 }}>% Percentage</button>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <StableInput value={discount} onChange={setDiscount} style={{ ...S.input, textAlign: "right" }} placeholder="0" />
+                <span style={{ fontSize: 13, color: "#555", whiteSpace: "nowrap" }}>{discountType === "percent" ? "%" : "AED"}</span>
+              </div>
+              {discountType === "percent" && parseNum(discount) > 0 && (
+                <div style={{ fontSize: 12, color: "#2d6a4f", marginTop: 4 }}>= {fmt(discountAmount)} off</div>
+              )}
             </div>
           </div>
           <div style={{ background: "#f5f9f5", border: "1.5px solid #2d6a4f", borderRadius: 6, padding: "14px 18px" }}>
@@ -528,7 +540,7 @@ export default function ProposalApp() {
               ["Sections Subtotal", fmt(allSectionTotal)],
               ["Installation & Configuration", fmt(parseNum(installation))],
               ["Subtotal", fmt(grandSubtotal)],
-              ...(parseNum(discount) > 0 ? [["Discount", `-${fmt(parseNum(discount))}`], ["After Discount", fmt(afterDiscount)]] : []),
+              ...(discountAmount > 0 ? [["Discount", `-${fmt(discountAmount)}`], ["After Discount", fmt(afterDiscount)]] : []),
               ["VAT 5%", fmt(vat)]
             ].map(([k, v]) => (
               <div key={k} style={S.summaryRow(false)}><span>{k}</span><span>{v}</span></div>
