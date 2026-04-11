@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, memo } from "react";
 
 const PRESET_ITEMS = {
   "Smart Automation": [
@@ -48,31 +48,59 @@ Exclusions:
 Warranty:
 • 1 year after delivery of equipment (smart home systems).`;
 
-const newItem = () => ({ id: Date.now() + Math.random(), desc: "", qty: "1", price: "0", image: null, preset: "" });
-const newSection = (name = "New Section") => ({ id: Date.now(), name, items: [newItem()] });
-
-const DEFAULT_SECTIONS = [
-  { id: 1, name: "Smart Automation", items: [newItem(), newItem(), newItem()] },
-  { id: 2, name: "Video Intercom", items: [newItem()] },
-  { id: 3, name: "CCTV System", items: [newItem()] },
-  { id: 4, name: "Sound System", items: [newItem()] },
-  { id: 5, name: "Network Structure", items: [newItem()] },
-];
+const uid = () => Date.now() + Math.random();
+const newItem = () => ({ id: uid(), desc: "", qty: "1", price: "0", image: null, preset: "" });
+const newSection = (name = "New Section") => ({ id: uid(), name, items: [newItem()] });
+const parseNum = v => parseFloat(v) || 0;
+const fmt = n => `AED ${Number(n).toLocaleString("en-AE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const SECTION_NAMES = ["Smart Automation", "Video Intercom", "CCTV System", "Sound System", "Network Structure", "Custom"];
 
-const parseNum = v => parseFloat(v) || 0;
+// Stable input that never loses focus
+const StableInput = memo(({ value, onChange, onBlur, style, placeholder, type = "text" }) => {
+  const [local, setLocal] = useState(value);
+  const ref = useRef();
+  useEffect(() => {
+    if (document.activeElement !== ref.current) setLocal(value);
+  }, [value]);
+  return (
+    <input
+      ref={ref}
+      type={type}
+      value={local}
+      placeholder={placeholder}
+      style={style}
+      onChange={e => { setLocal(e.target.value); onChange(e.target.value); }}
+      onBlur={() => { onBlur && onBlur(local); }}
+    />
+  );
+});
 
-const fmt = n => `AED ${Number(n).toLocaleString("en-AE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const StableTextarea = memo(({ value, onChange, rows, style, placeholder }) => {
+  const [local, setLocal] = useState(value);
+  const ref = useRef();
+  useEffect(() => {
+    if (document.activeElement !== ref.current) setLocal(value);
+  }, [value]);
+  return (
+    <textarea
+      ref={ref}
+      value={local}
+      rows={rows}
+      placeholder={placeholder}
+      style={style}
+      onChange={e => { setLocal(e.target.value); onChange(e.target.value); }}
+    />
+  );
+});
 
-// Auto-fit image box
-const AutoImage = ({ src, onRemove }) => {
+const AutoImage = memo(({ src, onRemove }) => {
   const [dims, setDims] = useState({ w: 80, h: 80 });
   useEffect(() => {
     if (!src) return;
     const img = new Image();
     img.onload = () => {
-      const maxW = 160, maxH = 120;
+      const maxW = 150, maxH = 110;
       const ratio = img.width / img.height;
       let w = img.width, h = img.height;
       if (w > maxW) { w = maxW; h = w / ratio; }
@@ -87,12 +115,106 @@ const AutoImage = ({ src, onRemove }) => {
       <button onClick={onRemove} style={{ background: "none", border: "none", color: "#c00", fontSize: 11, cursor: "pointer" }}>remove</button>
     </div>
   );
-};
+});
+
+const QtyInput = memo(({ value, onCommit }) => {
+  const [local, setLocal] = useState(value);
+  const ref = useRef();
+  useEffect(() => {
+    if (document.activeElement !== ref.current) setLocal(value);
+  }, [value]);
+  const step = delta => {
+    const next = Math.max(0, parseNum(local) + delta);
+    const rounded = Math.round(next * 2) / 2;
+    setLocal(String(rounded));
+    onCommit(String(rounded));
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+      <input
+        ref={ref}
+        type="text"
+        inputMode="decimal"
+        value={local}
+        onChange={e => { setLocal(e.target.value); onCommit(e.target.value); }}
+        style={{ width: 80, padding: "6px 8px", border: "1px solid #ddd", borderRadius: 5, fontSize: 13, textAlign: "right", boxSizing: "border-box" }}
+      />
+      <div style={{ display: "flex", gap: 2 }}>
+        <button onClick={() => step(-0.5)} style={{ flex: 1, fontSize: 15, padding: "2px 0", border: "1px solid #ddd", borderRadius: 3, background: "#f0f0f0", cursor: "pointer", fontWeight: 600 }}>−</button>
+        <button onClick={() => step(0.5)} style={{ flex: 1, fontSize: 15, padding: "2px 0", border: "1px solid #ddd", borderRadius: 3, background: "#f0f0f0", cursor: "pointer", fontWeight: 600 }}>+</button>
+      </div>
+    </div>
+  );
+});
+
+const ItemRow = memo(({ sec, it, idx, onUpdate, onRemove, onImage }) => {
+  const presets = PRESET_ITEMS[sec.name] || [];
+  const total = parseNum(it.qty) * parseNum(it.price);
+  const fileRef = useRef();
+
+  const td = { padding: "8px 10px", fontSize: 13, verticalAlign: "middle", borderBottom: "1px solid #ddd" };
+  const th = { background: "#2d6a4f", color: "#fff", padding: "9px 10px", textAlign: "left", fontSize: 12, fontWeight: 600, borderBottom: "2px solid #1a4a32", whiteSpace: "nowrap" };
+  const numInput = { width: "100%", padding: "7px 8px", border: "1px solid #ddd", borderRadius: 5, fontSize: 13, boxSizing: "border-box", textAlign: "right" };
+  const inp = { width: "100%", padding: "7px 10px", border: "1px solid #ddd", borderRadius: 5, fontSize: 13, boxSizing: "border-box" };
+
+  return (
+    <tr>
+      <td style={{ ...td, textAlign: "center", width: 36, fontWeight: 600 }}>{idx + 1}</td>
+      <td style={{ ...td, width: 120, textAlign: "center" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+          {it.image
+            ? <AutoImage src={it.image} onRemove={() => onUpdate(it.id, "image", null)} />
+            : <div onClick={() => fileRef.current.click()}
+                style={{ width: 70, height: 70, border: "2px dashed #bbb", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#aaa", fontSize: 28 }}>+</div>
+          }
+          {!it.image && <button onClick={() => fileRef.current.click()} style={{ fontSize: 11, color: "#2d6a4f", background: "none", border: "none", cursor: "pointer" }}>Upload</button>}
+          <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => onImage(it.id, e.target.files[0])} />
+        </div>
+      </td>
+      <td style={{ ...td, minWidth: 240 }}>
+        {presets.length > 0 && (
+          <select value={it.preset}
+            onChange={e => {
+              const found = presets.find(p => p.desc === e.target.value);
+              onUpdate(it.id, "__preset__", { preset: e.target.value, desc: found ? found.desc : "", price: found ? String(found.price) : it.price });
+            }}
+            style={{ ...inp, marginBottom: 5, color: it.preset ? "#333" : "#999" }}>
+            <option value="">— Select preset —</option>
+            {presets.map(p => <option key={p.desc} value={p.desc}>{p.desc}</option>)}
+            <option value="__custom__">Custom (type below)</option>
+          </select>
+        )}
+        <StableTextarea
+          value={it.desc}
+          onChange={v => onUpdate(it.id, "desc", v)}
+          rows={2}
+          placeholder="Item description..."
+          style={{ ...inp, resize: "vertical", fontSize: 12 }}
+        />
+      </td>
+      <td style={{ ...td, width: 100 }}>
+        <QtyInput value={it.qty} onCommit={v => onUpdate(it.id, "qty", v)} />
+      </td>
+      <td style={{ ...td, width: 130 }}>
+        <StableInput
+          value={it.price}
+          onChange={v => onUpdate(it.id, "price", v)}
+          placeholder="0.00"
+          style={numInput}
+        />
+      </td>
+      <td style={{ ...td, width: 140, textAlign: "right", fontWeight: 600, color: "#1a4a32" }}>{fmt(total)}</td>
+      <td style={{ ...td, width: 36, textAlign: "center" }}>
+        <button onClick={() => onRemove(it.id)} style={{ background: "transparent", border: "none", cursor: "pointer", color: "#c00", fontSize: 18 }} title="Remove">×</button>
+      </td>
+    </tr>
+  );
+});
 
 export default function ProposalApp() {
   const [header, setHeader] = useState({
     project: "Privet Villa", location: "Abu Dhabi",
-    date: new Date().toISOString().slice(0,10),
+    date: new Date().toISOString().slice(0, 10),
     ref: "LTR-ZT-HIM-BOR-14102024004-00",
     client: "Mr. Saeed",
     company: "Zettanet Technologies",
@@ -101,7 +223,13 @@ export default function ProposalApp() {
     slogan: "Smart Solutions for Modern Living",
     logo: null
   });
-  const [sections, setSections] = useState(DEFAULT_SECTIONS);
+  const [sections, setSections] = useState([
+    { id: 1, name: "Smart Automation", items: [newItem(), newItem()] },
+    { id: 2, name: "Video Intercom", items: [newItem()] },
+    { id: 3, name: "CCTV System", items: [newItem()] },
+    { id: 4, name: "Sound System", items: [newItem()] },
+    { id: 5, name: "Network Structure", items: [newItem()] },
+  ]);
   const [installation, setInstallation] = useState("3000");
   const [discount, setDiscount] = useState("3000");
   const [terms, setTerms] = useState(DEFAULT_TERMS);
@@ -109,45 +237,42 @@ export default function ProposalApp() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const logoRef = useRef();
 
-  const updateHeader = (k, v) => setHeader(h => ({ ...h, [k]: v }));
+  const updateHeader = useCallback((k, v) => setHeader(h => ({ ...h, [k]: v })), []);
 
   const handleLogoUpload = file => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = e => updateHeader("logo", e.target.result);
-    reader.readAsDataURL(file);
+    const r = new FileReader();
+    r.onload = e => updateHeader("logo", e.target.result);
+    r.readAsDataURL(file);
   };
 
-  const updateItem = (secId, itemId, field, value) => {
+  const updateItem = useCallback((secId, itemId, field, value) => {
     setSections(s => s.map(sec => sec.id !== secId ? sec : {
-      ...sec, items: sec.items.map(it => it.id !== itemId ? it : { ...it, [field]: value })
-    }));
-  };
-
-  const selectPreset = (secId, itemId, presetDesc, secName) => {
-    const presets = PRESET_ITEMS[secName] || [];
-    const found = presets.find(p => p.desc === presetDesc);
-    setSections(s => s.map(sec => sec.id !== secId ? sec : {
-      ...sec, items: sec.items.map(it => it.id !== itemId ? it : {
-        ...it, preset: presetDesc,
-        desc: found ? found.desc : presetDesc,
-        price: found ? String(found.price) : it.price
+      ...sec, items: sec.items.map(it => {
+        if (it.id !== itemId) return it;
+        if (field === "__preset__") return { ...it, ...value };
+        return { ...it, [field]: value };
       })
     }));
-  };
+  }, []);
+
+  const removeItem = useCallback((secId, itemId) => {
+    setSections(s => s.map(sec => sec.id !== secId ? sec : { ...sec, items: sec.items.filter(it => it.id !== itemId) }));
+  }, []);
+
+  const handleImage = useCallback((secId, itemId, file) => {
+    if (!file) return;
+    const r = new FileReader();
+    r.onload = e => setSections(s => s.map(sec => sec.id !== secId ? sec : {
+      ...sec, items: sec.items.map(it => it.id !== itemId ? it : { ...it, image: e.target.result })
+    }));
+    r.readAsDataURL(file);
+  }, []);
 
   const addItem = secId => setSections(s => s.map(sec => sec.id !== secId ? sec : { ...sec, items: [...sec.items, newItem()] }));
-  const removeItem = (secId, itemId) => setSections(s => s.map(sec => sec.id !== secId ? sec : { ...sec, items: sec.items.filter(it => it.id !== itemId) }));
   const addSection = () => setSections(s => [...s, newSection()]);
   const removeSection = secId => setSections(s => s.filter(sec => sec.id !== secId));
   const updateSecName = (secId, name) => setSections(s => s.map(sec => sec.id !== secId ? sec : { ...sec, name }));
-
-  const handleImageUpload = (secId, itemId, file) => {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = e => updateItem(secId, itemId, "image", e.target.result);
-    reader.readAsDataURL(file);
-  };
 
   const secTotal = sec => sec.items.reduce((sum, it) => sum + parseNum(it.qty) * parseNum(it.price), 0);
   const allSectionTotal = sections.reduce((sum, sec) => sum + secTotal(sec), 0);
@@ -159,10 +284,14 @@ export default function ProposalApp() {
   const handleExportPDF = async () => {
     setPdfLoading(true);
     try {
-      const script = document.createElement("script");
-      script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
-      document.head.appendChild(script);
-      await new Promise((res, rej) => { script.onload = res; script.onerror = rej; });
+      if (!window.html2pdf) {
+        await new Promise((res, rej) => {
+          const s = document.createElement("script");
+          s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
+          s.onload = res; s.onerror = rej;
+          document.head.appendChild(s);
+        });
+      }
       const el = document.getElementById("pdf-content");
       await window.html2pdf().set({
         margin: [8, 8, 8, 8],
@@ -171,104 +300,23 @@ export default function ProposalApp() {
         html2canvas: { scale: 3, useCORS: true, letterRendering: true },
         jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
       }).from(el).save();
-    } catch(e) {
+    } catch (e) {
       alert("PDF export failed. Use Print → Save as PDF instead.");
     }
     setPdfLoading(false);
   };
 
   const S = {
-    page: { fontFamily: "sans-serif", maxWidth: 980, margin: "0 auto", padding: "0 0 60px" },
-    tabs: { display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "center" },
-    tabBtn: active => ({ padding: "8px 20px", border: "1px solid #ccc", borderRadius: 6, cursor: "pointer", background: active ? "#2d6a4f" : "#fff", color: active ? "#fff" : "#333", fontWeight: active ? 600 : 400 }),
     card: { background: "#fff", border: "1px solid #e0e0e0", borderRadius: 8, padding: 20, marginBottom: 20 },
     label: { fontSize: 12, color: "#555", display: "block", marginBottom: 4, fontWeight: 500 },
     input: { width: "100%", padding: "7px 10px", border: "1px solid #ddd", borderRadius: 5, fontSize: 13, boxSizing: "border-box" },
-    numInput: { width: "100%", padding: "7px 8px", border: "1px solid #ddd", borderRadius: 5, fontSize: 13, boxSizing: "border-box", textAlign: "right" },
-    sectionHeader: { background: "#2d6a4f", color: "#fff", padding: "9px 14px", borderRadius: "6px 6px 0 0", fontWeight: 600, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "space-between" },
-    th: { background: "#2d6a4f", color: "#fff", padding: "9px 10px", textAlign: "left", fontSize: 12, fontWeight: 600, borderBottom: "2px solid #1a4a32", whiteSpace: "nowrap" },
-    td: { padding: "8px 10px", fontSize: 13, verticalAlign: "middle", borderBottom: "1px solid #ddd" },
-    btn: (color="#2d6a4f") => ({ background: color, color: "#fff", border: "none", borderRadius: 5, padding: "6px 14px", cursor: "pointer", fontSize: 13 }),
-    removeBtn: { background: "transparent", border: "none", cursor: "pointer", color: "#c00", fontSize: 18, lineHeight: 1 },
-    total: { textAlign: "right", padding: "7px 10px", fontSize: 13 },
-    summaryRow: bold => ({ display: "flex", justifyContent: "space-between", padding: "6px 0", fontWeight: bold ? 700 : 400, fontSize: bold ? 15 : 13, borderTop: bold ? "2px solid #2d6a4f" : "1px solid #eee", color: bold ? "#2d6a4f" : "inherit", marginTop: bold ? 4 : 0 }),
+    btn: (c = "#2d6a4f") => ({ background: c, color: "#fff", border: "none", borderRadius: 5, padding: "6px 14px", cursor: "pointer", fontSize: 13 }),
+    tabBtn: a => ({ padding: "8px 20px", border: "1px solid #ccc", borderRadius: 6, cursor: "pointer", background: a ? "#2d6a4f" : "#fff", color: a ? "#fff" : "#333", fontWeight: a ? 600 : 400 }),
+    summaryRow: b => ({ display: "flex", justifyContent: "space-between", padding: "6px 0", fontWeight: b ? 700 : 400, fontSize: b ? 15 : 13, borderTop: b ? "2px solid #2d6a4f" : "1px solid #eee", color: b ? "#2d6a4f" : "inherit" }),
   };
 
-  // QTY stepper with .5 increments
-  const QtyInput = ({ value, onChange }) => (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <input
-        type="text"
-        inputMode="decimal"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        style={{ ...S.numInput, width: 80 }}
-        placeholder="0"
-      />
-      <div style={{ display: "flex", gap: 2 }}>
-        <button onClick={() => onChange(String(Math.max(0, parseNum(value) - 0.5)))}
-          style={{ flex: 1, fontSize: 14, padding: "1px 0", border: "1px solid #ddd", borderRadius: 3, background: "#f5f5f5", cursor: "pointer" }}>−</button>
-        <button onClick={() => onChange(String(parseNum(value) + 0.5))}
-          style={{ flex: 1, fontSize: 14, padding: "1px 0", border: "1px solid #ddd", borderRadius: 3, background: "#f5f5f5", cursor: "pointer" }}>+</button>
-      </div>
-    </div>
-  );
-
-  const ItemRow = ({ sec, it, idx }) => {
-    const presets = PRESET_ITEMS[sec.name] || [];
-    const total = parseNum(it.qty) * parseNum(it.price);
-    const fileRef = useRef();
-    return (
-      <tr>
-        <td style={{ ...S.td, textAlign: "center", width: 36, fontWeight: 600 }}>{idx+1}</td>
-        <td style={{ ...S.td, width: 120, textAlign: "center" }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-            {it.image
-              ? <AutoImage src={it.image} onRemove={() => updateItem(sec.id, it.id, "image", null)} />
-              : <div onClick={() => fileRef.current.click()}
-                  style={{ width: 70, height: 70, border: "2px dashed #bbb", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#aaa", fontSize: 28 }}>+</div>
-            }
-            {!it.image && <button onClick={() => fileRef.current.click()} style={{ fontSize: 11, color: "#2d6a4f", background: "none", border: "none", cursor: "pointer" }}>Upload</button>}
-            <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => handleImageUpload(sec.id, it.id, e.target.files[0])} />
-          </div>
-        </td>
-        <td style={{ ...S.td, minWidth: 220 }}>
-          {presets.length > 0 && (
-            <select value={it.preset} onChange={e => selectPreset(sec.id, it.id, e.target.value, sec.name)}
-              style={{ ...S.input, marginBottom: 5, color: it.preset ? "#333" : "#999" }}>
-              <option value="">— Select preset —</option>
-              {presets.map(p => <option key={p.desc} value={p.desc}>{p.desc}</option>)}
-              <option value="__custom__">Custom (type below)</option>
-            </select>
-          )}
-          <textarea value={it.desc} onChange={e => updateItem(sec.id, it.id, "desc", e.target.value)}
-            placeholder="Item description..." rows={2}
-            style={{ ...S.input, resize: "vertical", fontSize: 12 }} />
-        </td>
-        <td style={{ ...S.td, width: 100 }}>
-          <QtyInput value={it.qty} onChange={v => updateItem(sec.id, it.id, "qty", v)} />
-        </td>
-        <td style={{ ...S.td, width: 130 }}>
-          <input
-            type="text" inputMode="decimal"
-            value={it.price}
-            onChange={e => updateItem(sec.id, it.id, "price", e.target.value)}
-            placeholder="0.00"
-            style={S.numInput}
-          />
-        </td>
-        <td style={{ ...S.td, width: 140, textAlign: "right", fontWeight: 600, color: "#1a4a32" }}>{fmt(total)}</td>
-        <td style={{ ...S.td, width: 36, textAlign: "center" }}>
-          <button onClick={() => removeItem(sec.id, it.id)} style={S.removeBtn} title="Remove">×</button>
-        </td>
-      </tr>
-    );
-  };
-
-  // PDF/Print content — high contrast, sharp borders
   const PDFContent = () => (
     <div id="pdf-content" style={{ fontFamily: "Arial, sans-serif", padding: 28, fontSize: 12, color: "#000", background: "#fff", maxWidth: 900 }}>
-      {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, borderBottom: "3px solid #2d6a4f", paddingBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           {header.logo
@@ -277,12 +325,12 @@ export default function ProposalApp() {
           }
           <div>
             <div style={{ fontWeight: 700, fontSize: 18, color: "#2d6a4f" }}>{header.company}</div>
-            <div style={{ fontSize: 11, color: "#555", marginTop: 2, fontStyle: "italic" }}>{header.slogan}</div>
+            <div style={{ fontSize: 11, color: "#555", fontStyle: "italic", marginTop: 2 }}>{header.slogan}</div>
             <div style={{ fontSize: 11, color: "#333", marginTop: 4 }}>{header.companyAddress}</div>
             <div style={{ fontSize: 11, color: "#333" }}>E: {header.companyEmail}</div>
           </div>
         </div>
-        <div style={{ textAlign: "right", fontSize: 11, color: "#333", lineHeight: 1.8 }}>
+        <div style={{ textAlign: "right", fontSize: 11, color: "#333", lineHeight: 1.9 }}>
           <div><b>Date:</b> {header.date}</div>
           <div><b>Ref:</b> {header.ref}</div>
           <div><b>Project:</b> {header.project}</div>
@@ -296,7 +344,7 @@ export default function ProposalApp() {
           <div style={{ background: "#2d6a4f", color: "#fff", padding: "7px 12px", fontWeight: 700, fontSize: 13, borderRadius: "4px 4px 0 0" }}>{sec.name}</div>
           <table style={{ width: "100%", borderCollapse: "collapse", border: "1.5px solid #2d6a4f" }}>
             <thead>
-              <tr>{["SN","Photo","Item Description","QTY","Unit Price (AED)","Total"].map(h => (
+              <tr>{["SN", "Photo", "Item Description", "QTY", "Unit Price (AED)", "Total"].map(h => (
                 <th key={h} style={{ background: "#e8f0e9", padding: "7px 9px", textAlign: "left", fontSize: 11, fontWeight: 700, borderBottom: "1.5px solid #2d6a4f", borderRight: "1px solid #ccc", color: "#000" }}>{h}</th>
               ))}</tr>
             </thead>
@@ -305,7 +353,7 @@ export default function ProposalApp() {
                 const tot = parseNum(it.qty) * parseNum(it.price);
                 return (
                   <tr key={it.id} style={{ background: i % 2 === 0 ? "#fff" : "#f9f9f9" }}>
-                    <td style={{ padding: "6px 9px", border: "1px solid #ccc", textAlign: "center", width: 30, fontWeight: 600 }}>{i+1}</td>
+                    <td style={{ padding: "6px 9px", border: "1px solid #ccc", textAlign: "center", width: 30, fontWeight: 600 }}>{i + 1}</td>
                     <td style={{ padding: "4px 8px", border: "1px solid #ccc", textAlign: "center", width: 90 }}>
                       {it.image && <img src={it.image} style={{ maxWidth: 80, maxHeight: 70, objectFit: "contain" }} alt="" />}
                     </td>
@@ -317,8 +365,8 @@ export default function ProposalApp() {
                 );
               })}
               <tr>
-                <td colSpan={5} style={{ textAlign: "right", padding: "7px 9px", background: "#2d6a4f", color: "#fff", fontWeight: 700, fontSize: 12, border: "1px solid #2d6a4f" }}>Section Total</td>
-                <td style={{ textAlign: "right", padding: "7px 9px", background: "#2d6a4f", color: "#fff", fontWeight: 700, fontSize: 12, border: "1px solid #2d6a4f" }}>{fmt(secTotal(sec))}</td>
+                <td colSpan={5} style={{ textAlign: "right", padding: "7px 9px", background: "#2d6a4f", color: "#fff", fontWeight: 700, border: "1px solid #2d6a4f" }}>Section Total</td>
+                <td style={{ textAlign: "right", padding: "7px 9px", background: "#2d6a4f", color: "#fff", fontWeight: 700, border: "1px solid #2d6a4f" }}>{fmt(secTotal(sec))}</td>
               </tr>
             </tbody>
           </table>
@@ -327,17 +375,10 @@ export default function ProposalApp() {
 
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 24 }}>
         <table style={{ width: 380, borderCollapse: "collapse", border: "1.5px solid #2d6a4f" }}>
-          {[
-            ["Sections Subtotal", fmt(allSectionTotal)],
-            ["Installation & Configuration", fmt(parseNum(installation))],
-            ["Subtotal", fmt(grandSubtotal)],
-            ["Discount", `-${fmt(parseNum(discount))}`],
-            ["After Discount", fmt(afterDiscount)],
-            ["VAT 5%", fmt(vat)]
-          ].map(([k,v]) => (
+          {[["Sections Subtotal", fmt(allSectionTotal)], ["Installation & Configuration", fmt(parseNum(installation))], ["Subtotal", fmt(grandSubtotal)], ["Discount", `-${fmt(parseNum(discount))}`], ["After Discount", fmt(afterDiscount)], ["VAT 5%", fmt(vat)]].map(([k, v]) => (
             <tr key={k}>
-              <td style={{ padding: "5px 10px", fontSize: 11, borderBottom: "1px solid #ddd", color: "#000" }}>{k}</td>
-              <td style={{ padding: "5px 10px", textAlign: "right", fontSize: 11, borderBottom: "1px solid #ddd", color: "#000" }}>{v}</td>
+              <td style={{ padding: "5px 10px", fontSize: 11, borderBottom: "1px solid #ddd" }}>{k}</td>
+              <td style={{ padding: "5px 10px", textAlign: "right", fontSize: 11, borderBottom: "1px solid #ddd" }}>{v}</td>
             </tr>
           ))}
           <tr>
@@ -346,13 +387,12 @@ export default function ProposalApp() {
           </tr>
         </table>
       </div>
-
       <div style={{ whiteSpace: "pre-wrap", fontSize: 11, color: "#000", borderTop: "2px solid #2d6a4f", paddingTop: 14, lineHeight: 1.7 }}>{terms}</div>
     </div>
   );
 
   return (
-    <div style={S.page}>
+    <div style={{ fontFamily: "sans-serif", maxWidth: 980, margin: "0 auto", padding: "0 0 60px" }}>
       <div style={{ background: "#2d6a4f", color: "#fff", padding: "16px 24px", borderRadius: 8, marginBottom: 20, display: "flex", alignItems: "center", gap: 16 }}>
         {header.logo
           ? <img src={header.logo} style={{ height: 50, objectFit: "contain", borderRadius: 4, background: "#fff", padding: 4 }} alt="logo" />
@@ -364,40 +404,36 @@ export default function ProposalApp() {
         </div>
       </div>
 
-      <div style={S.tabs}>
-        {["edit","preview"].map(t => <button key={t} onClick={() => setTab(t)} style={S.tabBtn(tab===t)}>{t === "edit" ? "Edit Proposal" : "Preview"}</button>)}
+      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+        {["edit", "preview"].map(t => <button key={t} onClick={() => setTab(t)} style={S.tabBtn(tab === t)}>{t === "edit" ? "Edit Proposal" : "Preview"}</button>)}
         <button onClick={() => window.print()} style={S.btn("#444")}>Print</button>
-        <button onClick={handleExportPDF} disabled={pdfLoading} style={{ ...S.btn("#1a4a32"), opacity: pdfLoading ? 0.7 : 1 }}>
-          {pdfLoading ? "Generating..." : "Export PDF"}
-        </button>
+        <button onClick={handleExportPDF} disabled={pdfLoading} style={{ ...S.btn("#1a4a32"), opacity: pdfLoading ? 0.7 : 1 }}>{pdfLoading ? "Generating..." : "Export PDF"}</button>
       </div>
 
       {tab === "edit" && <>
         <div style={S.card}>
           <div style={{ fontWeight: 600, marginBottom: 14, color: "#2d6a4f", fontSize: 15 }}>Company & Proposal Header</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 16, padding: 14, background: "#f5f9f5", borderRadius: 6, border: "1px solid #d0e8d0" }}>
-              <div>
-                {header.logo
-                  ? <img src={header.logo} style={{ height: 70, objectFit: "contain", borderRadius: 4, border: "1px solid #ddd" }} alt="logo" />
-                  : <div style={{ width: 70, height: 70, background: "#e8f0e9", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", color: "#2d6a4f", fontWeight: 700, fontSize: 20 }}>ZN</div>
-                }
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <button onClick={() => logoRef.current.click()} style={S.btn()}>Upload Logo</button>
-                {header.logo && <button onClick={() => updateHeader("logo", null)} style={{ ...S.btn("#c00") }}>Remove Logo</button>}
-                <input ref={logoRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => handleLogoUpload(e.target.files[0])} />
-                <span style={{ fontSize: 11, color: "#666" }}>PNG or JPG recommended</span>
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={S.label}>Company Slogan</label>
-                <input value={header.slogan} onChange={e => updateHeader("slogan", e.target.value)} style={S.input} placeholder="Smart Solutions for Modern Living" />
-              </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, padding: 14, background: "#f5f9f5", borderRadius: 6, border: "1px solid #d0e8d0", marginBottom: 14 }}>
+            {header.logo
+              ? <img src={header.logo} style={{ height: 70, objectFit: "contain", borderRadius: 4, border: "1px solid #ddd" }} alt="logo" />
+              : <div style={{ width: 70, height: 70, background: "#e8f0e9", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", color: "#2d6a4f", fontWeight: 700, fontSize: 20 }}>ZN</div>
+            }
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <button onClick={() => logoRef.current.click()} style={S.btn()}>Upload Logo</button>
+              {header.logo && <button onClick={() => updateHeader("logo", null)} style={S.btn("#c00")}>Remove</button>}
+              <input ref={logoRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => handleLogoUpload(e.target.files[0])} />
+              <span style={{ fontSize: 10, color: "#888" }}>PNG / JPG</span>
             </div>
-            {[["company","Company Name"],["companyEmail","Company Email"],["companyAddress","Company Address"],["client","Client Name"],["project","Project Name"],["location","Location"],["date","Date"],["ref","Reference No."]].map(([k,l]) => (
+            <div style={{ flex: 1 }}>
+              <label style={S.label}>Company Slogan</label>
+              <StableInput value={header.slogan} onChange={v => updateHeader("slogan", v)} style={S.input} placeholder="Your slogan here" />
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            {[["company", "Company Name"], ["companyEmail", "Company Email"], ["companyAddress", "Company Address"], ["client", "Client Name"], ["project", "Project Name"], ["location", "Location"], ["date", "Date"], ["ref", "Reference No."]].map(([k, l]) => (
               <div key={k}>
                 <label style={S.label}>{l}</label>
-                <input value={header[k]} onChange={e => updateHeader(k, e.target.value)} style={S.input} />
+                <StableInput value={header[k]} onChange={v => updateHeader(k, v)} style={S.input} />
               </div>
             ))}
           </div>
@@ -405,9 +441,10 @@ export default function ProposalApp() {
 
         {sections.map(sec => (
           <div key={sec.id} style={{ border: "1.5px solid #2d6a4f", borderRadius: 8, marginBottom: 20, overflow: "hidden" }}>
-            <div style={S.sectionHeader}>
+            <div style={{ background: "#2d6a4f", color: "#fff", padding: "9px 14px", fontWeight: 600, fontSize: 14, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <select value={SECTION_NAMES.includes(sec.name) ? sec.name : "Custom"} onChange={e => { if (e.target.value !== "Custom") updateSecName(sec.id, e.target.value); }}
+                <select value={SECTION_NAMES.includes(sec.name) ? sec.name : "Custom"}
+                  onChange={e => { if (e.target.value !== "Custom") updateSecName(sec.id, e.target.value); }}
                   style={{ background: "rgba(255,255,255,0.15)", color: "#fff", border: "1px solid rgba(255,255,255,0.4)", borderRadius: 4, padding: "3px 6px", fontSize: 13 }}>
                   {SECTION_NAMES.map(n => <option key={n} value={n} style={{ color: "#333" }}>{n}</option>)}
                 </select>
@@ -419,17 +456,24 @@ export default function ProposalApp() {
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
-                  <tr>{["SN","Photo","Item Description","QTY (±0.5)","Unit Price (AED)","Total",""].map(h => (
-                    <th key={h} style={S.th}>{h}</th>
+                  <tr>{["SN", "Photo", "Item Description", "QTY (±0.5)", "Unit Price (AED)", "Total", ""].map(h => (
+                    <th key={h} style={{ background: "#2d6a4f", color: "#fff", padding: "9px 10px", textAlign: "left", fontSize: 12, fontWeight: 600, borderBottom: "2px solid #1a4a32", whiteSpace: "nowrap" }}>{h}</th>
                   ))}</tr>
                 </thead>
                 <tbody>
-                  {sec.items.map((it, i) => <ItemRow key={it.id} sec={sec} it={it} idx={i} />)}
+                  {sec.items.map((it, i) => (
+                    <ItemRow
+                      key={it.id} sec={sec} it={it} idx={i}
+                      onUpdate={(itemId, field, value) => updateItem(sec.id, itemId, field, value)}
+                      onRemove={itemId => removeItem(sec.id, itemId)}
+                      onImage={(itemId, file) => handleImage(sec.id, itemId, file)}
+                    />
+                  ))}
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td colSpan={5} style={{ ...S.total, background: "#2d6a4f", color: "#fff", fontWeight: 700 }}>Section Total</td>
-                    <td style={{ ...S.total, background: "#2d6a4f", color: "#fff", fontWeight: 700 }}>{fmt(secTotal(sec))}</td>
+                    <td colSpan={5} style={{ textAlign: "right", padding: "7px 10px", background: "#2d6a4f", color: "#fff", fontWeight: 700, fontSize: 13 }}>Section Total</td>
+                    <td style={{ textAlign: "right", padding: "7px 10px", background: "#2d6a4f", color: "#fff", fontWeight: 700, fontSize: 13 }}>{fmt(secTotal(sec))}</td>
                     <td style={{ background: "#2d6a4f" }}></td>
                   </tr>
                 </tfoot>
@@ -450,22 +494,15 @@ export default function ProposalApp() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
             <div>
               <label style={S.label}>Installation / Programming / Configuration (AED)</label>
-              <input type="text" inputMode="decimal" value={installation} onChange={e => setInstallation(e.target.value)} style={S.numInput} />
+              <StableInput value={installation} onChange={setInstallation} style={{ ...S.input, textAlign: "right" }} />
             </div>
             <div>
               <label style={S.label}>Discount (AED)</label>
-              <input type="text" inputMode="decimal" value={discount} onChange={e => setDiscount(e.target.value)} style={S.numInput} />
+              <StableInput value={discount} onChange={setDiscount} style={{ ...S.input, textAlign: "right" }} />
             </div>
           </div>
           <div style={{ background: "#f5f9f5", border: "1.5px solid #2d6a4f", borderRadius: 6, padding: "14px 18px" }}>
-            {[
-              ["Sections Subtotal", fmt(allSectionTotal)],
-              ["Installation & Configuration", fmt(parseNum(installation))],
-              ["Subtotal", fmt(grandSubtotal)],
-              ["Discount", `-${fmt(parseNum(discount))}`],
-              ["After Discount", fmt(afterDiscount)],
-              ["VAT 5%", fmt(vat)]
-            ].map(([k,v]) => (
+            {[["Sections Subtotal", fmt(allSectionTotal)], ["Installation & Configuration", fmt(parseNum(installation))], ["Subtotal", fmt(grandSubtotal)], ["Discount", `-${fmt(parseNum(discount))}`], ["After Discount", fmt(afterDiscount)], ["VAT 5%", fmt(vat)]].map(([k, v]) => (
               <div key={k} style={S.summaryRow(false)}><span>{k}</span><span>{v}</span></div>
             ))}
             <div style={S.summaryRow(true)}><span>Total Amount</span><span>{fmt(finalTotal)}</span></div>
@@ -474,7 +511,7 @@ export default function ProposalApp() {
 
         <div style={S.card}>
           <div style={{ fontWeight: 600, marginBottom: 10, color: "#2d6a4f", fontSize: 15 }}>Terms & Conditions</div>
-          <textarea value={terms} onChange={e => setTerms(e.target.value)} rows={12} style={{ ...S.input, fontFamily: "inherit", lineHeight: 1.7 }} />
+          <StableTextarea value={terms} onChange={setTerms} rows={12} style={{ ...S.input, fontFamily: "inherit", lineHeight: 1.7 }} />
         </div>
       </>}
 
