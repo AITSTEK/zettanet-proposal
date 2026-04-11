@@ -278,8 +278,8 @@ export default function ProposalApp() {
   const secTotal = sec => sec.items.reduce((sum, it) => sum + parseNum(it.qty) * parseNum(it.price), 0);
   const allSectionTotal = sections.reduce((sum, sec) => sum + secTotal(sec), 0);
   const grandSubtotal = allSectionTotal + parseNum(installation);
-  const discountAmount = discountType === "percent" ? grandSubtotal * (parseNum(discount) / 100) : parseNum(discount);
-  const afterDiscount = grandSubtotal - discountAmount;
+  const discountAmount = discountType === "percent" ? allSectionTotal * (parseNum(discount) / 100) : parseNum(discount);
+  const afterDiscount = allSectionTotal - discountAmount + parseNum(installation);
   const vat = afterDiscount * 0.05;
   const finalTotal = afterDiscount + vat;
 
