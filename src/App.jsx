@@ -1,14 +1,50 @@
 import { useState, useRef, useEffect, useCallback, memo } from "react";
 
+// Supabase client (inline to avoid import issues in artifact)
+const SUPABASE_URL = "https://ikkaxqynotihgfspgetu.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlra2F4cXlub3RpaGdmc3BnZXR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU4NDAyODAsImV4cCI6MjA2MTQxNjI4MH0.8Q4j0mVJzFT5ZqQGXBLFKOBL4tXuT3kbWEBzqZmnZKw";
+
+const sbFetch = async (path, options = {}) => {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1${path}`, {
+    ...options,
+    headers: {
+      "apikey": SUPABASE_KEY,
+      "Authorization": `Bearer ${SUPABASE_KEY}`,
+      "Content-Type": "application/json",
+      "Prefer": options.prefer || "return=representation",
+      ...(options.headers || {}),
+    },
+  });
+  const data = res.status === 204 ? null : await res.json();
+  return { data, error: res.ok ? null : data };
+};
+
+const supabase = {
+  from: (table) => ({
+    select: (cols = "*") => ({
+      order: (col, { ascending } = {}) => ({
+        then: (fn) => sbFetch(`/${table}?select=${cols}&order=${col}.${ascending ? "asc" : "desc"}`).then(fn),
+        async exec() { return sbFetch(`/${table}?select=${cols}&order=${col}.${ascending ? "asc" : "desc"}`); }
+      }),
+      eq: (col, val) => ({
+        single: () => sbFetch(`/${table}?select=${cols}&${col}=eq.${val}`, { headers: { "Accept": "application/vnd.pgrst.object+json" } })
+      }),
+      async exec() { return sbFetch(`/${table}?select=${cols}`); }
+    }),
+    insert: (body) => ({
+      select: () => sbFetch(`/${table}`, { method: "POST", body: JSON.stringify(body) })
+    }),
+    update: (body) => ({
+      eq: (col, val) => ({
+        select: () => sbFetch(`/${table}?${col}=eq.${val}`, { method: "PATCH", body: JSON.stringify(body) })
+      })
+    }),
+  })
+};
+
 const C = {
-  primary: "#0078d4",
-  dark: "#005a9e",
-  darker: "#004578",
-  light: "#e8f4fc",
-  lighter: "#f0f8ff",
-  border: "#c7e0f4",
-  text: "#000",
-  white: "#fff",
+  primary: "#e7373e", dark: "#c02a30", darker: "#9e1f24",
+  light: "#fdeaea", lighter: "#fff5f5", border: "#f5c0c2",
 };
 
 const PRESET_ITEMS = {
@@ -137,23 +173,19 @@ const ItemRow = memo(({ sec, it, idx, onUpdate, onRemove, onImage }) => {
       <td style={{ ...td, textAlign: "center", width: 36, fontWeight: 600 }}>{idx + 1}</td>
       <td style={{ ...td, width: 120, textAlign: "center" }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-          {it.image
-            ? <AutoImage src={it.image} onRemove={() => onUpdate(it.id, "image", null)} />
+          {it.image ? <AutoImage src={it.image} onRemove={() => onUpdate(it.id, "image", null)} />
             : <div onClick={() => fileRef.current.click()}
-                style={{ width: 70, height: 70, border: `2px dashed ${C.border}`, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: C.primary, fontSize: 28 }}>+</div>
-          }
+                style={{ width: 70, height: 70, border: `2px dashed ${C.border}`, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: C.primary, fontSize: 28 }}>+</div>}
           {!it.image && <button onClick={() => fileRef.current.click()} style={{ fontSize: 11, color: C.primary, background: "none", border: "none", cursor: "pointer" }}>Upload</button>}
           <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => onImage(it.id, e.target.files[0])} />
         </div>
       </td>
       <td style={{ ...td, minWidth: 240 }}>
         {presets.length > 0 && (
-          <select value={it.preset}
-            onChange={e => {
-              const found = presets.find(p => p.desc === e.target.value);
-              onUpdate(it.id, "__preset__", { preset: e.target.value, desc: found ? found.desc : "", price: found ? String(found.price) : it.price });
-            }}
-            style={{ ...inp, marginBottom: 5, color: it.preset ? "#333" : "#999" }}>
+          <select value={it.preset} onChange={e => {
+            const found = presets.find(p => p.desc === e.target.value);
+            onUpdate(it.id, "__preset__", { preset: e.target.value, desc: found ? found.desc : "", price: found ? String(found.price) : it.price });
+          }} style={{ ...inp, marginBottom: 5, color: it.preset ? "#333" : "#999" }}>
             <option value="">— Select preset —</option>
             {presets.map(p => <option key={p.desc} value={p.desc}>{p.desc}</option>)}
             <option value="__custom__">Custom (type below)</option>
@@ -164,8 +196,7 @@ const ItemRow = memo(({ sec, it, idx, onUpdate, onRemove, onImage }) => {
       </td>
       <td style={{ ...td, width: 100 }}><QtyInput value={it.qty} onCommit={v => onUpdate(it.id, "qty", v)} /></td>
       <td style={{ ...td, width: 130 }}>
-        <StableInput value={it.price} onChange={v => onUpdate(it.id, "price", v)} placeholder="0.00"
-          style={{ ...inp, textAlign: "right" }} />
+        <StableInput value={it.price} onChange={v => onUpdate(it.id, "price", v)} placeholder="0.00" style={{ ...inp, textAlign: "right" }} />
       </td>
       <td style={{ ...td, width: 140, textAlign: "right", fontWeight: 600, color: C.darker }}>{fmt(total)}</td>
       <td style={{ ...td, width: 36, textAlign: "center" }}>
@@ -175,26 +206,34 @@ const ItemRow = memo(({ sec, it, idx, onUpdate, onRemove, onImage }) => {
   );
 });
 
+const DEFAULT_HEADER = {
+  project: "", location: "", date: new Date().toISOString().slice(0, 10),
+  ref: "", client: "", company: "Zettanet Technologies",
+  companyEmail: "info@zettanet.tech", companyAddress: "P.O. Box: 114345, Abu Dhabi, UAE",
+  slogan: "Smart Solutions for Modern Living", logo: null
+};
+
+const DEFAULT_SECTIONS = [
+  { id: 1, name: "Smart Automation", items: [newItem(), newItem()] },
+  { id: 2, name: "Video Intercom", items: [newItem()] },
+  { id: 3, name: "CCTV System", items: [newItem()] },
+  { id: 4, name: "Sound System", items: [newItem()] },
+  { id: 5, name: "Network Structure", items: [newItem()] },
+];
+
 export default function ProposalApp() {
-  const [header, setHeader] = useState({
-    project: "", location: "", date: new Date().toISOString().slice(0, 10),
-    ref: "", client: "", company: "Zettanet Technologies",
-    companyEmail: "info@zettanet.tech", companyAddress: "P.O. Box: 114345, Abu Dhabi, UAE",
-    slogan: "Smart Solutions for Modern Living", logo: null
-  });
-  const [sections, setSections] = useState([
-    { id: 1, name: "Smart Automation", items: [newItem(), newItem()] },
-    { id: 2, name: "Video Intercom", items: [newItem()] },
-    { id: 3, name: "CCTV System", items: [newItem()] },
-    { id: 4, name: "Sound System", items: [newItem()] },
-    { id: 5, name: "Network Structure", items: [newItem()] },
-  ]);
+  const [header, setHeader] = useState(DEFAULT_HEADER);
+  const [sections, setSections] = useState(DEFAULT_SECTIONS);
   const [installation, setInstallation] = useState("0");
   const [discount, setDiscount] = useState("0");
   const [discountType, setDiscountType] = useState("lumpsum");
   const [terms, setTerms] = useState(DEFAULT_TERMS);
   const [tab, setTab] = useState("edit");
-  const [pdfLoading, setPdfLoading] = useState(false);
+  const [currentId, setCurrentId] = useState(null);
+  const [quotes, setQuotes] = useState([]);
+  const [showQuotes, setShowQuotes] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState("");
   const logoRef = useRef();
 
   const updateHeader = useCallback((k, v) => setHeader(h => ({ ...h, [k]: v })), []);
@@ -249,6 +288,78 @@ export default function ProposalApp() {
     return () => { const el = document.getElementById("no-print-style"); if (el) el.remove(); };
   }, []);
 
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveMsg("");
+    const payload = {
+      client_name: header.client,
+      project_name: header.project,
+      location: header.location,
+      ref_number: header.ref,
+      date: header.date,
+      sections,
+      installation: parseNum(installation),
+      discount: parseNum(discount),
+      discount_type: discountType,
+      terms,
+      header,
+      total_amount: finalTotal,
+      status: "draft",
+      updated_at: new Date().toISOString(),
+    };
+    let result;
+    if (currentId) {
+      result = await supabase.from("quotes").update(payload).eq("id", currentId).select();
+    } else {
+      result = await supabase.from("quotes").insert(payload).select();
+    }
+    if (result.error) {
+      setSaveMsg("❌ Save failed: " + JSON.stringify(result.error));
+    } else {
+      if (!currentId && result.data?.[0]) setCurrentId(result.data[0].id);
+      setSaveMsg("✅ Quote saved successfully!");
+    }
+    setSaving(false);
+    setTimeout(() => setSaveMsg(""), 3000);
+  };
+
+  const handleLoadList = async () => {
+    const result = await sbFetch("/quotes?select=id,client_name,project_name,total_amount,date,updated_at&order=updated_at.desc");
+    if (!result.error) setQuotes(result.data || []);
+    setShowQuotes(true);
+  };
+
+  const handleLoad = async (id) => {
+    const result = await sbFetch(`/quotes?select=*&id=eq.${id}`, { headers: { "Accept": "application/vnd.pgrst.object+json" } });
+    const data = result.data;
+    if (!result.error && data) {
+      setHeader(data.header || DEFAULT_HEADER);
+      setSections(data.sections || DEFAULT_SECTIONS);
+      setInstallation(String(data.installation || 0));
+      setDiscount(String(data.discount || 0));
+      setDiscountType(data.discount_type || "lumpsum");
+      setTerms(data.terms || DEFAULT_TERMS);
+      setCurrentId(data.id);
+      setShowQuotes(false);
+      setTab("edit");
+      setSaveMsg("✅ Quote loaded!");
+      setTimeout(() => setSaveMsg(""), 3000);
+    }
+  };
+
+  // New quote
+  const handleNew = () => {
+    setHeader({ ...DEFAULT_HEADER, date: new Date().toISOString().slice(0, 10) });
+    setSections(DEFAULT_SECTIONS.map(s => ({ ...s, id: uid(), items: [newItem()] })));
+    setInstallation("0");
+    setDiscount("0");
+    setDiscountType("lumpsum");
+    setTerms(DEFAULT_TERMS);
+    setCurrentId(null);
+    setShowQuotes(false);
+    setSaveMsg("");
+  };
+
   const handlePrint = () => {
     const els = document.querySelectorAll(".no-print");
     els.forEach(el => el.style.display = "none");
@@ -257,15 +368,12 @@ export default function ProposalApp() {
   };
 
   const handleExportPDF = () => {
-    // Switch to preview tab so PDF content is visible
     setTab("preview");
     setTimeout(() => {
       const els = document.querySelectorAll(".no-print");
       els.forEach(el => el.style.display = "none");
       window.print();
-      setTimeout(() => {
-        els.forEach(el => el.style.display = "");
-      }, 1500);
+      setTimeout(() => els.forEach(el => el.style.display = ""), 1500);
     }, 300);
   };
 
@@ -291,10 +399,8 @@ export default function ProposalApp() {
     <div id="pdf-content" style={{ fontFamily: "Arial, sans-serif", padding: 28, fontSize: 12, color: "#000", background: "#fff", maxWidth: 900 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, borderBottom: `3px solid ${C.primary}`, paddingBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          {header.logo
-            ? <img src={header.logo} style={{ height: 70, objectFit: "contain" }} alt="logo" />
-            : <div style={{ width: 70, height: 70, background: C.primary, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 18 }}>ZN</div>
-          }
+          {header.logo ? <img src={header.logo} style={{ height: 70, objectFit: "contain" }} alt="logo" />
+            : <div style={{ width: 70, height: 70, background: C.primary, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 18 }}>ZN</div>}
           <div>
             <div style={{ fontWeight: 700, fontSize: 18, color: C.primary }}>{header.company}</div>
             <div style={{ fontSize: 11, color: "#555", fontStyle: "italic", marginTop: 2 }}>{header.slogan}</div>
@@ -310,7 +416,6 @@ export default function ProposalApp() {
           {header.client && <div><b>Client:</b> {header.client}</div>}
         </div>
       </div>
-
       {sections.map(sec => (
         <div key={sec.id} style={{ marginBottom: 22 }}>
           <div style={{ background: C.primary, color: "#fff", padding: "7px 12px", fontWeight: 700, fontSize: 13, borderRadius: "4px 4px 0 0" }}>{sec.name}</div>
@@ -344,7 +449,6 @@ export default function ProposalApp() {
           </table>
         </div>
       ))}
-
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 24 }}>
         <table style={{ width: 380, borderCollapse: "collapse", border: `1.5px solid ${C.primary}` }}>
           {summaryRows.map(([k, v]) => (
@@ -365,31 +469,74 @@ export default function ProposalApp() {
 
   return (
     <div style={{ fontFamily: "sans-serif", maxWidth: 980, margin: "0 auto", padding: "0 0 60px" }}>
-      <div className="no-print" style={{ background: C.primary, color: "#fff", padding: "16px 24px", borderRadius: 8, marginBottom: 20, display: "flex", alignItems: "center", gap: 16 }}>
-        {header.logo
-          ? <img src={header.logo} style={{ height: 50, objectFit: "contain", borderRadius: 4, background: "#fff", padding: 4 }} alt="logo" />
-          : <div style={{ width: 50, height: 50, background: "rgba(255,255,255,0.2)", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 16 }}>ZN</div>
-        }
-        <div>
-          <div style={{ fontSize: 20, fontWeight: 600 }}>Zettanet Technologies — Proposal Generator</div>
-          <div style={{ fontSize: 12, opacity: 0.85, fontStyle: "italic" }}>{header.slogan}</div>
+      {/* Top bar */}
+      <div className="no-print" style={{ background: C.primary, color: "#fff", padding: "14px 24px", borderRadius: 8, marginBottom: 16, display: "flex", alignItems: "center", gap: 16 }}>
+        {header.logo ? <img src={header.logo} style={{ height: 46, objectFit: "contain", borderRadius: 4, background: "#fff", padding: 4 }} alt="logo" />
+          : <div style={{ width: 46, height: 46, background: "rgba(255,255,255,0.2)", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 15 }}>ZN</div>}
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 18, fontWeight: 600 }}>Zettanet Technologies — Proposal Generator</div>
+          <div style={{ fontSize: 11, opacity: 0.85, fontStyle: "italic" }}>{header.slogan}</div>
         </div>
+        {currentId && <div style={{ fontSize: 11, opacity: 0.7, textAlign: "right" }}>ID: {currentId.slice(0, 8)}...</div>}
       </div>
 
-      <div className="no-print" style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+      {/* Action bar */}
+      <div className="no-print" style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
         {["edit", "preview"].map(t => <button key={t} onClick={() => setTab(t)} style={S.tabBtn(tab === t)}>{t === "edit" ? "Edit Proposal" : "Preview"}</button>)}
         <button onClick={handlePrint} style={S.btn("#444")}>Print</button>
         <button onClick={handleExportPDF} style={S.btn(C.darker)}>Export PDF</button>
+        <div style={{ flex: 1 }} />
+        <button onClick={handleNew} style={S.btn("#666")}>+ New Quote</button>
+        <button onClick={handleLoadList} style={S.btn("#2563eb")}>📂 My Quotes</button>
+        <button onClick={handleSave} disabled={saving} style={{ ...S.btn("#16a34a"), opacity: saving ? 0.7 : 1 }}>
+          {saving ? "Saving..." : currentId ? "💾 Update Quote" : "💾 Save Quote"}
+        </button>
       </div>
+
+      {saveMsg && <div className="no-print" style={{ padding: "10px 16px", background: saveMsg.includes("❌") ? "#fee2e2" : "#dcfce7", borderRadius: 6, marginBottom: 14, fontSize: 13, fontWeight: 500 }}>{saveMsg}</div>}
+
+      {/* Quotes List Modal */}
+      {showQuotes && (
+        <div className="no-print" style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: 10, padding: 24, width: 600, maxHeight: "80vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div style={{ fontWeight: 700, fontSize: 16, color: C.primary }}>Saved Quotes</div>
+              <button onClick={() => setShowQuotes(false)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#666" }}>×</button>
+            </div>
+            {quotes.length === 0 ? (
+              <div style={{ textAlign: "center", color: "#999", padding: 40 }}>No saved quotes yet.</div>
+            ) : (
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>{["Client", "Project", "Total", "Date", ""].map(h => (
+                    <th key={h} style={{ padding: "8px 10px", background: C.light, textAlign: "left", fontSize: 12, fontWeight: 600, borderBottom: `2px solid ${C.border}` }}>{h}</th>
+                  ))}</tr>
+                </thead>
+                <tbody>
+                  {quotes.map((q, i) => (
+                    <tr key={q.id} style={{ background: i % 2 === 0 ? "#fff" : C.lighter }}>
+                      <td style={{ padding: "9px 10px", fontSize: 13, borderBottom: `1px solid ${C.border}` }}>{q.client_name || "—"}</td>
+                      <td style={{ padding: "9px 10px", fontSize: 13, borderBottom: `1px solid ${C.border}` }}>{q.project_name || "—"}</td>
+                      <td style={{ padding: "9px 10px", fontSize: 13, borderBottom: `1px solid ${C.border}`, fontWeight: 600 }}>{fmt(q.total_amount)}</td>
+                      <td style={{ padding: "9px 10px", fontSize: 12, borderBottom: `1px solid ${C.border}`, color: "#666" }}>{q.date}</td>
+                      <td style={{ padding: "9px 10px", borderBottom: `1px solid ${C.border}` }}>
+                        <button onClick={() => handleLoad(q.id)} style={S.btn()}>Open</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
 
       {tab === "edit" && <>
         <div style={S.card}>
           <div style={{ fontWeight: 600, marginBottom: 14, color: C.primary, fontSize: 15 }}>Company & Proposal Header</div>
           <div style={{ display: "flex", alignItems: "center", gap: 16, padding: 14, background: C.lighter, borderRadius: 6, border: `1px solid ${C.border}`, marginBottom: 14 }}>
-            {header.logo
-              ? <img src={header.logo} style={{ height: 70, objectFit: "contain", borderRadius: 4, border: `1px solid ${C.border}` }} alt="logo" />
-              : <div style={{ width: 70, height: 70, background: C.light, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", color: C.primary, fontWeight: 700, fontSize: 20 }}>ZN</div>
-            }
+            {header.logo ? <img src={header.logo} style={{ height: 70, objectFit: "contain", borderRadius: 4, border: `1px solid ${C.border}` }} alt="logo" />
+              : <div style={{ width: 70, height: 70, background: C.light, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", color: C.primary, fontWeight: 700, fontSize: 20 }}>ZN</div>}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <button onClick={() => logoRef.current.click()} style={S.btn()}>Upload Logo</button>
               {header.logo && <button onClick={() => updateHeader("logo", null)} style={S.btn("#c00")}>Remove</button>}
