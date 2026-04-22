@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, memo } from "react";
 
 // Supabase client (inline to avoid import issues in artifact)
 const SUPABASE_URL = "https://ikkaxqynotihgfspgetu.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlra2F4cXlub3RpaGdmc3BnZXR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU4NDAyODAsImV4cCI6MjA2MTQxNjI4MH0.8Q4j0mVJzFT5ZqQGXBLFKOBL4tXuT3kbWEBzqZmnZKw";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlra2F4cXlub3RpaGdmc3BnZXR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NjMzOTgsImV4cCI6MjA5MjQzOTM5OH0.laatJSILxBAtDT3h53PV3j1tdIGzk67VZ6Q3Vx6pFPE";
 
 const sbFetch = async (path, options = {}) => {
   const res = await fetch(`${SUPABASE_URL}/rest/v1${path}`, {
